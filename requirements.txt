@@ -4,3 +4,6 @@
 flask>=3.0.0
 opencv-python-headless>=4.9.0
 numpy>=1.24.0
+
+# 웨이퍼 스캔 콘솔(/scan)의 갠트리 모터 제어 (Orange Pi GPIO, libgpiod v2)
+gpiod==2.5.0
