@@ -1,0 +1,142 @@
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --border: #e1e5ea;
+  --text: #2c3e50;
+  --muted: #7f8c8d;
+  --primary: #2f80ed;
+  --accent: #f39c12;
+  --danger: #e74c3c;
+  --good: #27ae60;
+  --die-empty: #eef1f4;
+  --die-off: transparent;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.4;
+}
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); font-size: 0.82rem; }
+.hint { color: var(--muted); font-size: 0.8rem; margin: 8px 0 0; }
+
+/* 상단 */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  padding: 12px 20px; background: var(--card); border-bottom: 1px solid var(--border);
+}
+.title h1 { margin: 0; font-size: 1.2rem; }
+.subtitle { color: var(--muted); font-size: 0.85rem; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  font-size: 0.78rem; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: #fff; color: var(--muted);
+}
+.chip.ok   { border-color: var(--good);   color: var(--good); }
+.chip.warn { border-color: var(--accent); color: #b36b00; }
+.chip.bad  { border-color: var(--danger); color: var(--danger); }
+.nav { display: flex; gap: 4px; }
+
+.banner {
+  margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px;
+  background: #fdecea; border: 1px solid #f5c6c0; color: #a93226; font-size: 0.88rem;
+}
+.banner.info { background: #eaf2fd; border-color: #c4dafa; color: #1c5fb8; }
+
+/* 버튼 */
+.btn {
+  border: 1px solid var(--border); background: #fff; color: var(--text);
+  padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 0.88rem;
+  text-decoration: none; display: inline-block;
+}
+.btn:hover:not(:disabled) { background: #f0f3f7; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: #1e6fd9; }
+.btn.danger  { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger:hover:not(:disabled) { background: #c0392b; }
+.btn.accent  { border-color: var(--accent); color: #b36b00; }
+.btn.link    { color: var(--primary); border-color: transparent; }
+.btn.big     { padding: 12px 16px; font-size: 1rem; font-weight: 600; }
+
+/* 레이아웃 */
+.layout {
+  display: grid; gap: 16px; padding: 16px 20px 28px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+  grid-template-areas: "cam side" "mosaic side";
+  align-items: start;
+}
+.camera-card { grid-area: cam; }
+.side { grid-area: side; display: flex; flex-direction: column; gap: 16px; }
+.mosaic-card { grid-area: mosaic; }
+@media (max-width: 980px) {
+  .layout { grid-template-columns: 1fr; grid-template-areas: "cam" "side" "mosaic"; padding: 12px 16px 24px; }
+}
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.card-head h2 { margin: 0; font-size: 1rem; }
+.row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.row.wrap { flex-wrap: wrap; gap: 6px; }
+
+/* 카메라 */
+.camera-wrap { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9; }
+.camera-wrap img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.crosshair { position: absolute; inset: 0; pointer-events: none; }
+.crosshair::before, .crosshair::after {
+  content: ""; position: absolute; background: rgba(255, 80, 80, 0.85);
+}
+.crosshair::before { left: 50%; top: 42%; width: 1px; height: 16%; }
+.crosshair::after  { top: 50%; left: 45.5%; height: 1px; width: 9%; }
+.exposure label { font-size: 0.85rem; }
+.exposure input[type=range] { flex: 1; }
+.check { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; }
+
+/* 실행 */
+.run-buttons { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.progress { height: 8px; background: var(--die-empty); border-radius: 999px; margin-top: 12px; overflow: hidden; }
+.bar { height: 100%; width: 0; background: var(--primary); transition: width 0.3s; }
+.job-line { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 0.86rem; }
+
+/* 이동 */
+.pos { font-size: 0.9rem; }
+.move-grid { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; }
+.jogpad { display: grid; grid-template-columns: repeat(3, auto); gap: 4px; justify-items: center; align-items: center; }
+.jogpad .jog { min-width: 64px; }
+.jogpad select { font-size: 0.8rem; padding: 4px; border: 1px solid var(--border); border-radius: 6px; }
+#minimap { width: 100%; max-height: 190px; }
+@media (max-width: 420px) { .move-grid { grid-template-columns: 1fr; } }
+
+/* 범위 확인 */
+.corners { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 10px; }
+.corners figure { margin: 0; }
+.corners img { width: 100%; border-radius: 6px; display: block; border: 1px solid var(--border); }
+.corners figcaption { font-size: 0.75rem; color: var(--muted); }
+
+/* 설정 */
+.form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 10px; }
+.form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.84rem; }
+.form label.check { flex-direction: row; }
+.form input[type=number] { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem; }
+
+/* 모자이크 */
+.mosaic { display: grid; gap: 4px; max-width: 760px; margin: 0 auto; }
+.die {
+  position: relative; aspect-ratio: 16 / 9; border-radius: 4px; overflow: hidden;
+  background: var(--die-empty); border: 1px solid var(--border);
+}
+.die.off { background: var(--die-off); border-color: transparent; }
+.die.current { outline: 2px solid var(--accent); outline-offset: 1px; }
+.die img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.die a { display: block; width: 100%; height: 100%; }
+.die .id {
+  position: absolute; left: 3px; top: 2px; font-size: 0.68rem; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.die.done .id { color: #fff; text-shadow: 0 0 3px #000; }

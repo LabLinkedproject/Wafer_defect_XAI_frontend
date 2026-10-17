@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>웨이퍼 스캔 콘솔</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/scan.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="title">
+    <h1>웨이퍼 모델 스캔 콘솔</h1>
+    <div class="subtitle" id="specLine">8.5인치 · 44다이 모델</div>
+  </div>
+  <div class="chips">
+    <span class="chip" id="chipGpio">GPIO</span>
+    <span class="chip" id="chipOrigin">원점</span>
+    <span class="chip" id="chipCal">보정</span>
+    <span class="chip" id="chipDry" hidden>DRY-RUN</span>
+  </div>
+  <nav class="nav">
+    <a class="btn link" href="/">실시간 검출</a>
+    <a class="btn link" href="/analysis">공정 분석</a>
+  </nav>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<main class="layout">
+  <!-- 카메라 -->
+  <section class="card camera-card">
+    <div class="card-head">
+      <h2>카메라</h2>
+      <span class="muted" id="camInfo">1920×1080 · 화면 중앙 십자선 = 촬영 기준점</span>
+    </div>
+    <div class="camera-wrap">
+      <img id="cam" src="/video_feed" alt="카메라 실시간 영상">
+      <div class="crosshair" aria-hidden="true"></div>
+    </div>
+    <div class="row exposure">
+      <label for="expo">노출</label>
+      <input type="range" id="expo" min="1" max="200" step="1" value="20">
+      <span class="num" id="expoVal">20</span>
+      <label class="check"><input type="checkbox" id="expoAuto"> 자동</label>
+    </div>
+    <p class="hint">반사가 심하면 노출을 낮추세요. 이 카메라는 자동 노출에서 쉽게 하얗게 포화됩니다.</p>
+  </section>
+
+  <!-- 제어 -->
+  <section class="side">
+    <div class="card run-card">
+      <div class="card-head"><h2>원클릭 스캔</h2><span class="muted" id="eta"></span></div>
+      <div class="run-buttons">
+        <button class="btn primary big" id="btnScan">▶ 웨이퍼 스캔 시작</button>
+        <button class="btn danger big" id="btnStop">■ 정지</button>
+      </div>
+      <div class="progress"><div class="bar" id="bar"></div></div>
+      <div class="job-line"><span id="jobMsg">대기 중</span><span class="num" id="jobCount"></span></div>
+      <p class="hint">웨이퍼 중심 → 44개 다이를 지그재그로 돌며 정지·촬영 → 웨이퍼 중심 복귀</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>위치 · 이동</h2>
+        <span class="num pos" id="posLine">X —  Y —</span></div>
+      <div class="move-grid">
+        <div class="jogpad">
+          <span></span><button class="btn jog" data-axis="y" data-dir="1">Y+ ▲</button><span></span>
+          <button class="btn jog" data-axis="x" data-dir="-1">◀ X−</button>
+          <select id="stepSel" aria-label="이동 단위">
+            <option value="1">1 mm</option>
+            <option value="5">5 mm</option>
+            <option value="10" selected>10 mm</option>
+            <option value="24">24 mm (1다이)</option>
+            <option value="50">50 mm</option>
+          </select>
+          <button class="btn jog" data-axis="x" data-dir="1">X+ ▶</button>
+          <span></span><button class="btn jog" data-axis="y" data-dir="-1">Y− ▼</button><span></span>
+        </div>
+        <svg id="minimap" viewBox="0 0 220 190" role="img" aria-label="갠트리 좌표 미니맵"></svg>
+      </div>
+      <div class="row wrap">
+        <button class="btn" id="btnOrigin">갠트리 원점</button>
+        <button class="btn" id="btnWaferCenter">웨이퍼 중심으로</button>
+        <button class="btn accent" id="btnSetCenter">현재 위치 = 웨이퍼 중심</button>
+      </div>
+      <p class="hint">카메라 십자선이 웨이퍼 중심(가운데 네 다이가 만나는 점)에 오도록 이동한 뒤
+        <b>현재 위치 = 웨이퍼 중심</b>을 누르세요. 스캔 좌표는 모두 이 점 기준입니다.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>스캔 범위 확인</h2><span class="muted" id="boundsInfo"></span></div>
+      <button class="btn" id="btnBounds">네 모서리 돌며 촬영</button>
+      <div class="corners" id="corners"></div>
+      <p class="hint">다이 영역의 바깥 경계 네 모서리를 찍습니다. 검정 테이프로 표시한 범위와 맞는지 보세요.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>설정</h2></div>
+      <div class="form">
+        <label>속도 <span class="muted">RPM</span><input type="number" id="cfgRpm" min="10" max="240" step="5"></label>
+        <label>정지 후 대기 <span class="muted">초</span><input type="number" id="cfgDwell" min="0" max="5" step="0.1"></label>
+        <label>다이 피치 <span class="muted">mm</span><input type="number" id="cfgPitch" min="5" max="60" step="0.1"></label>
+        <label class="check"><input type="checkbox" id="cfgFlipX"> X 방향 반전</label>
+        <label class="check"><input type="checkbox" id="cfgFlipY"> Y 방향 반전</label>
+      </div>
+      <button class="btn" id="btnSave">설정 저장</button>
+      <p class="hint" id="pitchHint"></p>
+    </div>
+  </section>
+
+  <!-- 결과 모자이크 -->
+  <section class="card mosaic-card">
+    <div class="card-head">
+      <h2>스캔 결과</h2>
+      <span class="muted" id="scanDir">아직 스캔 없음</span>
+    </div>
+    <div class="mosaic" id="mosaic"></div>
+    <p class="hint">칸을 누르면 원본(1920×1080)이 새 탭에서 열립니다. 번호는 다이 ID입니다.</p>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='js/scan.js') }}"></script>
+</body>
+</html>
