@@ -23,12 +23,15 @@ JOB_NAMES = {"train": "모델 학습", "fetch_wm811k": "데이터 내려받기",
 STALL_SECONDS = 180           # 프로세스는 있는데 이 시간 동안 진행 기록이 없으면 멈춤 의심
 
 
+_session: dict = {}
+
+
 def report(job: str, done: int, total: int, detail: str = "", **extra):
     """작업 진행도를 남긴다. 화면이 읽는 도중 깨지지 않도록 교체 방식으로 쓴다."""
     row = {"job": job, "done": done, "total": total, "detail": detail, "time": time.time(), **extra}
     path = os.path.join(PROGRESS_DIR, f"progress_{job}.json")
-    prev = _read_json(path)
-    row["started"] = prev["started"] if prev and done else time.time()
+    # 남은 시간은 이번 실행의 속도로 계산한다. 이어받기로 건너뛴 양이 섞이면 크게 틀어진다
+    row["started"], row["base"] = _session.setdefault(job, (time.time(), done))
     os.makedirs(PROGRESS_DIR, exist_ok=True)
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
@@ -78,7 +81,7 @@ def _read_json(path):
 def _processes() -> list[dict]:
     """실행 중인 training.* 프로세스"""
     out = []
-    for pid in filter(str.isdigit, os.listdir("/proc")):
+    for pid in sorted(filter(str.isdigit, os.listdir("/proc")), key=int):
         try:
             with open(f"/proc/{pid}/cmdline", "rb") as f:
                 argv = f.read().decode("utf8", "replace").split("\0")
@@ -88,8 +91,10 @@ def _processes() -> list[dict]:
         if "python" not in os.path.basename(argv[0]) or "-m" not in argv:
             continue
         module = argv[argv.index("-m") + 1] if argv.index("-m") + 1 < len(argv) else ""
-        if module.startswith("training."):
-            out.append({"pid": int(pid), "job": module.split(".", 1)[1], "cmd": " ".join(argv)})
+        job = module.split(".", 1)[1] if module.startswith("training.") else ""
+        # 작업자 프로세스는 같은 명령줄을 가지므로 작업당 하나만 센다
+        if job and job not in {p["job"] for p in out}:
+            out.append({"pid": int(pid), "job": job, "cmd": " ".join(argv)})
     return out
 
 
@@ -147,8 +152,9 @@ def _job(p: dict, prog, history: list[dict], now: float, log_time: float) -> dic
     elif fresh:
         job.update(unit=fresh.get("unit", ""), done=fresh["done"], total=fresh["total"], detail=fresh.get("detail", ""),
                    last_update_age=round(now - fresh["time"]), elapsed_seconds=round(now - fresh["started"]))
-        if fresh["done"] and fresh["total"]:
-            job["eta_seconds"] = round((now - fresh["started"]) / fresh["done"] * (fresh["total"] - fresh["done"]))
+        moved = fresh["done"] - fresh.get("base", 0)
+        if moved > 0 and fresh["total"]:
+            job["eta_seconds"] = round((now - fresh["started"]) / moved * (fresh["total"] - fresh["done"]))
     # 전체 절차는 하위 작업이 도는 동안 스스로 갱신하지 않는다
     job["stalled"] = (p["job"] != "pipeline" and job.get("last_update_age", 0) > STALL_SECONDS
                       and (job.get("cpu_percent") or 0) < 20)

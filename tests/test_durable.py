@@ -12,6 +12,7 @@ class Atomic(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.path = os.path.join(self.dir.name, "ck.pt")
+        durable.EVENTS = os.path.join(self.dir.name, "events.log")
 
     def tearDown(self):
         self.dir.cleanup()

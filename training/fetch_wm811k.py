@@ -9,9 +9,11 @@ WM-811K 전체를 내려받아 맵마다 불량 좌표만 남긴다. 라벨 없�
 """
 from __future__ import annotations
 import concurrent.futures as cf
+import ctypes
 import gzip
 import json
 import os
+import signal
 import sys
 import time
 import urllib.request
@@ -33,6 +35,14 @@ NAMES = {"Center": 0, "Donut": 1, "Edge-Loc": 2, "Edge Ring": 3, "Edge-Ring": 3,
          "Scratch": 6, "Near-full": 7, "Near Full": 7, "None": 8, "none": 8}
 # 노트북 wm-811k-wafermap.ipynb 출력의 원본 통계
 EXPECTED = {"labeled": 172950, "pattern": 25519, "per_class": [4294, 555, 5189, 9680, 3593, 866, 1193, 149]}
+
+
+def die_with_parent():
+    """부모가 강제 종료되면 작업자도 끝나게 한다. PR_SET_PDEATHSIG = 1.
+    작업자는 부모의 신호 처리기를 물려받으므로 기본 동작으로 되돌려야 실제로 끝난다."""
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    signal.signal(signal.SIGHUP, signal.SIG_DFL)
+    ctypes.CDLL("libc.so.6").prctl(1, signal.SIGTERM)
 
 
 def table(rows: list[dict], prefix: str = "") -> dict:
@@ -97,7 +107,7 @@ def main():
     results, last_ok = {}, time.time()
     pending = list(range(SHARDS))
     durable.event(f"내려받기 시작: 남은 샤드 확인 중")
-    with cf.ProcessPoolExecutor(WORKERS) as ex:
+    with cf.ProcessPoolExecutor(WORKERS, initializer=die_with_parent) as ex:
         while pending and not durable.stop_requested():
             batch, pending = pending[:WORKERS * 8], pending[WORKERS * 8:]
             for k, counts in zip(batch, ex.map(fetch, batch)):
