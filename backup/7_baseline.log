@@ -1,1 +1,2 @@
 {'method': '노트북 재현: 59개 특징 + One-vs-One 선형 SVM', 'train': 16731, 'test': 4738, 'test_accuracy': 0.8734, 'per_class_recall': {'Center': 0.8984, 'Donut': 0.6, 'Edge-Loc': 0.811, 'Edge-Ring': 0.9601, 'Local': 0.8469, 'Random': 0.907, 'Scratch': 0.4646, 'Near-full': 0.75}}
+{'method': '노트북 재현: 59개 특징 + One-vs-One 선형 SVM', 'train': 16731, 'test': 4738, 'test_accuracy': 0.8734, 'per_class_recall': {'Center': 0.8984, 'Donut': 0.6, 'Edge-Loc': 0.811, 'Edge-Ring': 0.9601, 'Local': 0.8469, 'Random': 0.907, 'Scratch': 0.4646, 'Near-full': 0.75}}

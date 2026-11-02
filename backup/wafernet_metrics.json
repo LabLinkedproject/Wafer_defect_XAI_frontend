@@ -1,291 +1,291 @@
 {
-  "epoch": 16,
-  "val_score": 0.7289,
+  "epoch": 17,
+  "val_score": 0.7263,
   "temperature": 0.8000000000000003,
   "tests": {
     "WM-811K 로트 분리 시험 (실제 공장 데이터)": {
       "size": 10323,
       "conditions": {
         "44다이 판정": {
-          "exact_match": 0.6545,
+          "exact_match": 0.7076,
           "exact_ci": [
-            0.5382,
-            0.819
+            0.5857,
+            0.856
           ],
-          "macro_f1": 0.4459,
+          "macro_f1": 0.4792,
           "macro_ci": [
-            0.3445,
-            0.482
+            0.3906,
+            0.5
           ],
-          "normal_correct": 0.8297,
-          "ece": 0.1632,
+          "normal_correct": 0.9192,
+          "ece": 0.1655,
           "per_class": {
             "Center": {
-              "precision": 0.4134,
-              "recall": 0.5518,
-              "f1": 0.4727,
-              "gmean": 0.7278,
+              "precision": 0.4703,
+              "recall": 0.6474,
+              "f1": 0.5448,
+              "gmean": 0.7895,
               "support": 502
             },
             "Donut": {
-              "precision": 0.2738,
-              "recall": 0.575,
-              "f1": 0.371,
-              "gmean": 0.756,
+              "precision": 0.3182,
+              "recall": 0.525,
+              "f1": 0.3962,
+              "gmean": 0.723,
               "support": 40
             },
             "Edge-Loc": {
-              "precision": 0.3897,
-              "recall": 0.6708,
-              "f1": 0.493,
-              "gmean": 0.755,
+              "precision": 0.5116,
+              "recall": 0.6809,
+              "f1": 0.5842,
+              "gmean": 0.7859,
               "support": 1291
             },
             "Edge-Ring": {
-              "precision": 0.9408,
-              "recall": 0.698,
-              "f1": 0.8014,
-              "gmean": 0.831,
+              "precision": 0.9501,
+              "recall": 0.7029,
+              "f1": 0.808,
+              "gmean": 0.8347,
               "support": 2003
             },
             "Local": {
-              "precision": 0.2831,
-              "recall": 0.3306,
-              "f1": 0.305,
-              "gmean": 0.5596,
+              "precision": 0.276,
+              "recall": 0.3453,
+              "f1": 0.3068,
+              "gmean": 0.5705,
               "support": 614
             },
             "Random": {
-              "precision": 0.66,
-              "recall": 0.7674,
-              "f1": 0.7097,
-              "gmean": 0.8746,
+              "precision": 0.9,
+              "recall": 0.6279,
+              "f1": 0.7397,
+              "gmean": 0.7922,
               "support": 86
             },
             "Scratch": {
-              "precision": 0.0584,
-              "recall": 0.1313,
-              "f1": 0.0809,
-              "gmean": 0.3548,
+              "precision": 0.1008,
+              "recall": 0.197,
+              "f1": 0.1333,
+              "gmean": 0.4361,
               "support": 198
             },
             "Near-full": {
-              "precision": 0.2,
+              "precision": 0.1905,
               "recall": 1.0,
-              "f1": 0.3333,
+              "f1": 0.32,
               "gmean": 0.9992,
               "support": 4
             }
           },
-          "ece_before": 0.1555
+          "ece_before": 0.1375
         },
         "44다이 2×2 구역": {
-          "exact_match": 0.7509,
+          "exact_match": 0.7739,
           "exact_ci": [
-            0.6497,
-            0.8399
+            0.6598,
+            0.8606
           ],
-          "macro_f1": 0.6055,
+          "macro_f1": 0.5801,
           "macro_ci": [
-            0.4389,
-            0.6209
+            0.4686,
+            0.5886
           ],
-          "normal_correct": 0.8455,
-          "ece": 0.137,
+          "normal_correct": 0.9065,
+          "ece": 0.1536,
           "per_class": {
             "Center": {
-              "precision": 0.622,
-              "recall": 0.7211,
-              "f1": 0.6679,
-              "gmean": 0.8396,
+              "precision": 0.5849,
+              "recall": 0.755,
+              "f1": 0.6591,
+              "gmean": 0.8569,
               "support": 502
             },
             "Donut": {
-              "precision": 0.5333,
-              "recall": 0.6,
-              "f1": 0.5647,
-              "gmean": 0.7738,
+              "precision": 0.4545,
+              "recall": 0.5,
+              "f1": 0.4762,
+              "gmean": 0.7063,
               "support": 40
             },
             "Edge-Loc": {
-              "precision": 0.4895,
-              "recall": 0.7057,
-              "f1": 0.578,
-              "gmean": 0.7946,
+              "precision": 0.5967,
+              "recall": 0.7483,
+              "f1": 0.6639,
+              "gmean": 0.8332,
               "support": 1291
             },
             "Edge-Ring": {
-              "precision": 0.9825,
-              "recall": 0.9506,
-              "f1": 0.9663,
-              "gmean": 0.973,
+              "precision": 0.9689,
+              "recall": 0.9501,
+              "f1": 0.9594,
+              "gmean": 0.9711,
               "support": 2003
             },
             "Local": {
-              "precision": 0.3736,
-              "recall": 0.3779,
-              "f1": 0.3757,
-              "gmean": 0.6023,
+              "precision": 0.315,
+              "recall": 0.4104,
+              "f1": 0.3564,
+              "gmean": 0.6223,
               "support": 614
             },
             "Random": {
-              "precision": 0.7113,
-              "recall": 0.8023,
-              "f1": 0.7541,
-              "gmean": 0.8945,
+              "precision": 0.9028,
+              "recall": 0.7558,
+              "f1": 0.8228,
+              "gmean": 0.8691,
               "support": 86
             },
             "Scratch": {
-              "precision": 0.1853,
-              "recall": 0.2424,
-              "f1": 0.2101,
-              "gmean": 0.4872,
+              "precision": 0.1612,
+              "recall": 0.2727,
+              "f1": 0.2026,
+              "gmean": 0.5149,
               "support": 198
             },
             "Near-full": {
-              "precision": 0.5714,
+              "precision": 0.3333,
               "recall": 1.0,
-              "f1": 0.7273,
-              "gmean": 0.9999,
+              "f1": 0.5,
+              "gmean": 0.9996,
               "support": 4
             }
           },
-          "ece_before": 0.1322
+          "ece_before": 0.1311
         },
         "44다이 3×3 구역": {
-          "exact_match": 0.7694,
+          "exact_match": 0.7947,
           "exact_ci": [
-            0.6725,
-            0.8526
+            0.6853,
+            0.8761
           ],
-          "macro_f1": 0.6028,
+          "macro_f1": 0.6105,
           "macro_ci": [
-            0.3938,
-            0.6348
+            0.4233,
+            0.6251
           ],
-          "normal_correct": 0.8688,
-          "ece": 0.1185,
+          "normal_correct": 0.9295,
+          "ece": 0.1313,
           "per_class": {
             "Center": {
-              "precision": 0.7837,
-              "recall": 0.6713,
-              "f1": 0.7232,
-              "gmean": 0.8154,
+              "precision": 0.7114,
+              "recall": 0.7072,
+              "f1": 0.7093,
+              "gmean": 0.8347,
               "support": 502
             },
             "Donut": {
-              "precision": 0.5778,
-              "recall": 0.65,
-              "f1": 0.6118,
-              "gmean": 0.8055,
+              "precision": 0.5429,
+              "recall": 0.475,
+              "f1": 0.5067,
+              "gmean": 0.6887,
               "support": 40
             },
             "Edge-Loc": {
-              "precision": 0.512,
-              "recall": 0.708,
-              "f1": 0.5943,
-              "gmean": 0.7998,
+              "precision": 0.6255,
+              "recall": 0.7335,
+              "f1": 0.6752,
+              "gmean": 0.8292,
               "support": 1291
             },
             "Edge-Ring": {
-              "precision": 0.9855,
-              "recall": 0.9481,
-              "f1": 0.9664,
-              "gmean": 0.9721,
+              "precision": 0.9725,
+              "recall": 0.9526,
+              "f1": 0.9624,
+              "gmean": 0.9728,
               "support": 2003
             },
             "Local": {
-              "precision": 0.3936,
-              "recall": 0.3616,
-              "f1": 0.3769,
-              "gmean": 0.5906,
+              "precision": 0.351,
+              "recall": 0.4202,
+              "f1": 0.3825,
+              "gmean": 0.6321,
               "support": 614
             },
             "Random": {
-              "precision": 0.6333,
-              "recall": 0.8837,
-              "f1": 0.7379,
-              "gmean": 0.938,
+              "precision": 0.8659,
+              "recall": 0.8256,
+              "f1": 0.8452,
+              "gmean": 0.9081,
               "support": 86
             },
             "Scratch": {
-              "precision": 0.29,
-              "recall": 0.3384,
-              "f1": 0.3124,
-              "gmean": 0.577,
+              "precision": 0.214,
+              "recall": 0.3232,
+              "f1": 0.2575,
+              "gmean": 0.5619,
               "support": 198
             },
             "Near-full": {
-              "precision": 0.5,
-              "recall": 0.5,
-              "f1": 0.5,
-              "gmean": 0.707,
+              "precision": 0.4286,
+              "recall": 0.75,
+              "f1": 0.5455,
+              "gmean": 0.8659,
               "support": 4
             }
           },
-          "ece_before": 0.1183
+          "ece_before": 0.1171
         },
         "44다이 6×6 구역": {
-          "exact_match": 0.7852,
+          "exact_match": 0.8094,
           "exact_ci": [
-            0.6866,
-            0.862
+            0.6977,
+            0.8939
           ],
-          "macro_f1": 0.5969,
+          "macro_f1": 0.6242,
           "macro_ci": [
-            0.3662,
-            0.6574
+            0.4248,
+            0.6725
           ],
-          "normal_correct": 0.9049,
-          "ece": 0.0917,
+          "normal_correct": 0.9622,
+          "ece": 0.0871,
           "per_class": {
             "Center": {
-              "precision": 0.8635,
-              "recall": 0.5797,
-              "f1": 0.6937,
-              "gmean": 0.7596,
+              "precision": 0.8315,
+              "recall": 0.6096,
+              "f1": 0.7034,
+              "gmean": 0.7783,
               "support": 502
             },
             "Donut": {
-              "precision": 0.7778,
-              "recall": 0.35,
-              "f1": 0.4828,
-              "gmean": 0.5915,
+              "precision": 0.8333,
+              "recall": 0.375,
+              "f1": 0.5172,
+              "gmean": 0.6123,
               "support": 40
             },
             "Edge-Loc": {
-              "precision": 0.558,
-              "recall": 0.6375,
-              "f1": 0.5951,
-              "gmean": 0.7691,
+              "precision": 0.6838,
+              "recall": 0.6398,
+              "f1": 0.6611,
+              "gmean": 0.7828,
               "support": 1291
             },
             "Edge-Ring": {
-              "precision": 0.9865,
-              "recall": 0.9491,
-              "f1": 0.9674,
-              "gmean": 0.9727,
+              "precision": 0.9776,
+              "recall": 0.9566,
+              "f1": 0.9669,
+              "gmean": 0.9755,
               "support": 2003
             },
             "Local": {
-              "precision": 0.4819,
-              "recall": 0.2818,
-              "f1": 0.3556,
-              "gmean": 0.5257,
+              "precision": 0.4324,
+              "recall": 0.3176,
+              "f1": 0.3662,
+              "gmean": 0.5561,
               "support": 614
             },
             "Random": {
-              "precision": 0.4969,
-              "recall": 0.9302,
-              "f1": 0.6478,
-              "gmean": 0.9607,
+              "precision": 0.6829,
+              "recall": 0.9767,
+              "f1": 0.8038,
+              "gmean": 0.9864,
               "support": 86
             },
             "Scratch": {
-              "precision": 0.3502,
+              "precision": 0.2576,
               "recall": 0.3838,
-              "f1": 0.3663,
-              "gmean": 0.6152,
+              "f1": 0.3083,
+              "gmean": 0.6128,
               "support": 198
             },
             "Near-full": {
@@ -296,7 +296,7 @@
               "support": 4
             }
           },
-          "ece_before": 0.0999
+          "ece_before": 0.0875
         }
       }
     },
@@ -304,291 +304,291 @@
       "size": 5550,
       "conditions": {
         "44다이 판정": {
-          "exact_match": 0.4514,
+          "exact_match": 0.4314,
           "exact_ci": [
-            0.4093,
-            0.4899
+            0.3909,
+            0.4762
           ],
-          "macro_f1": 0.8326,
+          "macro_f1": 0.8334,
           "macro_ci": [
-            0.8175,
-            0.8453
+            0.817,
+            0.8465
           ],
-          "normal_correct": 1.0,
-          "ece": 0.1078,
+          "normal_correct": 0.9933,
+          "ece": 0.1301,
           "per_class": {
             "Center": {
-              "precision": 0.8692,
-              "recall": 0.9303,
-              "f1": 0.8987,
-              "gmean": 0.9272,
+              "precision": 0.8699,
+              "recall": 0.9364,
+              "f1": 0.902,
+              "gmean": 0.9303,
               "support": 1950
             },
             "Donut": {
-              "precision": 0.9435,
-              "recall": 0.8622,
-              "f1": 0.901,
-              "gmean": 0.917,
+              "precision": 0.9518,
+              "recall": 0.8439,
+              "f1": 0.8946,
+              "gmean": 0.9092,
               "support": 1800
             },
             "Edge-Loc": {
-              "precision": 0.5415,
-              "recall": 0.72,
-              "f1": 0.6181,
-              "gmean": 0.6944,
+              "precision": 0.5188,
+              "recall": 0.7518,
+              "f1": 0.6139,
+              "gmean": 0.6839,
               "support": 1950
             },
             "Edge-Ring": {
-              "precision": 0.7892,
-              "recall": 0.9256,
-              "f1": 0.852,
-              "gmean": 0.9032,
+              "precision": 0.7884,
+              "recall": 0.9106,
+              "f1": 0.8451,
+              "gmean": 0.8965,
               "support": 1800
             },
             "Local": {
-              "precision": 0.937,
-              "recall": 0.9204,
-              "f1": 0.9286,
-              "gmean": 0.9308,
+              "precision": 0.9103,
+              "recall": 0.947,
+              "f1": 0.9283,
+              "gmean": 0.9291,
               "support": 2700
             },
             "Scratch": {
-              "precision": 0.8284,
-              "recall": 0.7688,
-              "f1": 0.7975,
-              "gmean": 0.7997,
+              "precision": 0.7678,
+              "recall": 0.8726,
+              "f1": 0.8169,
+              "gmean": 0.7935,
               "support": 2850
             }
           },
-          "ece_before": 0.102
+          "ece_before": 0.1219
         },
         "44다이 2×2 구역": {
-          "exact_match": 0.6357,
+          "exact_match": 0.6353,
           "exact_ci": [
-            0.5984,
-            0.671
+            0.6031,
+            0.6712
           ],
-          "macro_f1": 0.9032,
+          "macro_f1": 0.9045,
           "macro_ci": [
-            0.8912,
-            0.9126
+            0.8928,
+            0.9146
           ],
           "normal_correct": 1.0,
-          "ece": 0.0737,
+          "ece": 0.0881,
           "per_class": {
             "Center": {
-              "precision": 0.9625,
-              "recall": 0.9615,
-              "f1": 0.962,
-              "gmean": 0.9706,
+              "precision": 0.9611,
+              "recall": 0.9744,
+              "f1": 0.9677,
+              "gmean": 0.9765,
               "support": 1950
             },
             "Donut": {
-              "precision": 0.9994,
-              "recall": 0.9628,
-              "f1": 0.9808,
-              "gmean": 0.9811,
+              "precision": 1.0,
+              "recall": 0.9539,
+              "f1": 0.9764,
+              "gmean": 0.9767,
               "support": 1800
             },
             "Edge-Loc": {
-              "precision": 0.6388,
-              "recall": 0.7918,
-              "f1": 0.7071,
-              "gmean": 0.7745,
+              "precision": 0.641,
+              "recall": 0.8251,
+              "f1": 0.7215,
+              "gmean": 0.7865,
               "support": 1950
             },
             "Edge-Ring": {
-              "precision": 0.8396,
-              "recall": 0.9539,
-              "f1": 0.8931,
-              "gmean": 0.933,
+              "precision": 0.8424,
+              "recall": 0.9444,
+              "f1": 0.8905,
+              "gmean": 0.9297,
               "support": 1800
             },
             "Local": {
-              "precision": 0.9871,
-              "recall": 0.9363,
-              "f1": 0.961,
-              "gmean": 0.962,
+              "precision": 0.9721,
+              "recall": 0.9552,
+              "f1": 0.9636,
+              "gmean": 0.9646,
               "support": 2700
             },
             "Scratch": {
-              "precision": 0.956,
-              "recall": 0.8775,
-              "f1": 0.9151,
-              "gmean": 0.9166,
+              "precision": 0.8976,
+              "recall": 0.9168,
+              "f1": 0.9071,
+              "gmean": 0.9031,
               "support": 2850
             }
           },
-          "ece_before": 0.0765
+          "ece_before": 0.0883
         },
         "44다이 3×3 구역": {
-          "exact_match": 0.6551,
+          "exact_match": 0.6667,
           "exact_ci": [
-            0.6176,
-            0.6914
+            0.6333,
+            0.702
           ],
-          "macro_f1": 0.9132,
+          "macro_f1": 0.9156,
           "macro_ci": [
-            0.9018,
-            0.9223
+            0.9045,
+            0.9257
           ],
           "normal_correct": 1.0,
-          "ece": 0.0692,
+          "ece": 0.0784,
           "per_class": {
             "Center": {
-              "precision": 0.9952,
-              "recall": 0.9585,
-              "f1": 0.9765,
-              "gmean": 0.9778,
+              "precision": 0.9922,
+              "recall": 0.9769,
+              "f1": 0.9845,
+              "gmean": 0.9863,
               "support": 1950
             },
             "Donut": {
               "precision": 1.0,
-              "recall": 0.9944,
-              "f1": 0.9972,
-              "gmean": 0.9972,
+              "recall": 0.9878,
+              "f1": 0.9939,
+              "gmean": 0.9939,
               "support": 1800
             },
             "Edge-Loc": {
-              "precision": 0.6452,
-              "recall": 0.8056,
-              "f1": 0.7165,
-              "gmean": 0.7825,
+              "precision": 0.6702,
+              "recall": 0.821,
+              "f1": 0.738,
+              "gmean": 0.8008,
               "support": 1950
             },
             "Edge-Ring": {
-              "precision": 0.8343,
-              "recall": 0.9706,
-              "f1": 0.8973,
-              "gmean": 0.9385,
+              "precision": 0.844,
+              "recall": 0.9617,
+              "f1": 0.899,
+              "gmean": 0.9379,
               "support": 1800
             },
             "Local": {
-              "precision": 0.996,
-              "recall": 0.933,
-              "f1": 0.9635,
-              "gmean": 0.9642,
+              "precision": 0.9799,
+              "recall": 0.9548,
+              "f1": 0.9672,
+              "gmean": 0.968,
               "support": 2700
             },
             "Scratch": {
-              "precision": 0.9565,
-              "recall": 0.9018,
-              "f1": 0.9283,
-              "gmean": 0.9288,
+              "precision": 0.9051,
+              "recall": 0.9172,
+              "f1": 0.9111,
+              "gmean": 0.9078,
               "support": 2850
             }
           },
-          "ece_before": 0.0717
+          "ece_before": 0.0802
         },
         "44다이 6×6 구역": {
-          "exact_match": 0.616,
+          "exact_match": 0.6214,
           "exact_ci": [
-            0.575,
-            0.6542
+            0.5868,
+            0.6582
           ],
-          "macro_f1": 0.8953,
+          "macro_f1": 0.895,
           "macro_ci": [
-            0.8832,
-            0.9056
+            0.8823,
+            0.9042
           ],
           "normal_correct": 1.0,
-          "ece": 0.0501,
+          "ece": 0.035,
           "per_class": {
             "Center": {
-              "precision": 0.9994,
-              "recall": 0.9195,
-              "f1": 0.9578,
-              "gmean": 0.9588,
+              "precision": 0.9984,
+              "recall": 0.9333,
+              "f1": 0.9647,
+              "gmean": 0.9657,
               "support": 1950
             },
             "Donut": {
               "precision": 1.0,
-              "recall": 0.9856,
-              "f1": 0.9927,
-              "gmean": 0.9928,
+              "recall": 0.9711,
+              "f1": 0.9853,
+              "gmean": 0.9854,
               "support": 1800
             },
             "Edge-Loc": {
-              "precision": 0.6623,
-              "recall": 0.7282,
-              "f1": 0.6937,
-              "gmean": 0.7627,
+              "precision": 0.7057,
+              "recall": 0.7256,
+              "f1": 0.7155,
+              "gmean": 0.7789,
               "support": 1950
             },
             "Edge-Ring": {
-              "precision": 0.8124,
-              "recall": 0.9717,
-              "f1": 0.8849,
-              "gmean": 0.9311,
+              "precision": 0.8472,
+              "recall": 0.9489,
+              "f1": 0.8952,
+              "gmean": 0.9332,
               "support": 1800
             },
             "Local": {
-              "precision": 0.9962,
-              "recall": 0.8726,
-              "f1": 0.9303,
-              "gmean": 0.9327,
+              "precision": 0.9971,
+              "recall": 0.8837,
+              "f1": 0.937,
+              "gmean": 0.9389,
               "support": 2700
             },
             "Scratch": {
-              "precision": 0.9544,
-              "recall": 0.874,
-              "f1": 0.9125,
-              "gmean": 0.9141,
+              "precision": 0.929,
+              "recall": 0.8218,
+              "f1": 0.8721,
+              "gmean": 0.8759,
               "support": 2850
             }
           },
-          "ece_before": 0.0532
+          "ece_before": 0.0479
         }
       }
     }
   },
   "rule_baseline_44die": {
-    "exact_match": 0.5302,
+    "exact_match": 0.5607,
     "exact_ci": [
-      0.3429,
-      0.8093
+      0.3803,
+      0.83
     ],
-    "macro_f1": 0.194,
+    "macro_f1": 0.2211,
     "macro_ci": [
-      0.1063,
-      0.2207
+      0.1476,
+      0.241
     ],
-    "normal_correct": 0.8766,
-    "ece": 0.1882,
+    "normal_correct": 0.8981,
+    "ece": 0.194,
     "per_class": {
       "Center": {
-        "precision": 0.5464,
-        "recall": 0.4104,
-        "f1": 0.4687,
-        "gmean": 0.635,
+        "precision": 0.6039,
+        "recall": 0.6135,
+        "f1": 0.6087,
+        "gmean": 0.7752,
         "support": 502
       },
       "Donut": {
-        "precision": 0.6875,
-        "recall": 0.275,
-        "f1": 0.3929,
-        "gmean": 0.5243,
+        "precision": 0.6667,
+        "recall": 0.3,
+        "f1": 0.4138,
+        "gmean": 0.5476,
         "support": 40
       },
       "Edge-Loc": {
-        "precision": 0.4201,
-        "recall": 0.2424,
-        "f1": 0.3075,
-        "gmean": 0.4805,
+        "precision": 0.3774,
+        "recall": 0.3029,
+        "f1": 0.3361,
+        "gmean": 0.5303,
         "support": 1291
       },
       "Edge-Ring": {
-        "precision": 0.25,
-        "recall": 0.004,
-        "f1": 0.0079,
-        "gmean": 0.0631,
+        "precision": 0.3913,
+        "recall": 0.0045,
+        "f1": 0.0089,
+        "gmean": 0.067,
         "support": 2003
       },
       "Local": {
-        "precision": 0.2937,
-        "recall": 0.1287,
-        "f1": 0.1789,
-        "gmean": 0.3552,
+        "precision": 0.216,
+        "recall": 0.1189,
+        "f1": 0.1534,
+        "gmean": 0.3401,
         "support": 614
       },
       "Random": {
@@ -599,17 +599,17 @@
         "support": 86
       },
       "Scratch": {
-        "precision": 0.2261,
-        "recall": 0.1313,
-        "f1": 0.1661,
-        "gmean": 0.3608,
+        "precision": 0.3187,
+        "recall": 0.1465,
+        "f1": 0.2007,
+        "gmean": 0.3815,
         "support": 198
       },
       "Near-full": {
-        "precision": 0.0154,
+        "precision": 0.0244,
         "recall": 1.0,
-        "f1": 0.0304,
-        "gmean": 0.9876,
+        "f1": 0.0476,
+        "gmean": 0.9922,
         "support": 4
       }
     }
@@ -738,6 +738,7 @@
     "near_full": {
       "학습 모델": [
         "Random",
+        "Edge-Ring",
         "Scratch"
       ],
       "규칙": [
@@ -746,6 +747,7 @@
     },
     "donut_scratch": {
       "학습 모델": [
+        "Random",
         "Donut"
       ],
       "규칙": [

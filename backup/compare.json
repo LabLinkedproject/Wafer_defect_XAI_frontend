@@ -2,35 +2,35 @@
   "test_maps": 4738,
   "conditions": {
     "44다이 판정": {
-      "cnn_accuracy": 0.6773,
-      "svm_accuracy": 0.7108,
+      "cnn_accuracy": 0.6921,
+      "svm_accuracy": 0.7383,
       "cnn": {
         "Center": {
-          "recall": 0.6534,
+          "recall": 0.8327,
           "n": 502
         },
         "Donut": {
-          "recall": 0.675,
+          "recall": 0.6,
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.7002,
+          "recall": 0.6476,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.8223,
+          "recall": 0.8582,
           "n": 2003
         },
         "Local": {
-          "recall": 0.3436,
+          "recall": 0.3485,
           "n": 614
         },
         "Random": {
-          "recall": 0.4767,
+          "recall": 0.2791,
           "n": 86
         },
         "Scratch": {
-          "recall": 0.2374,
+          "recall": 0.202,
           "n": 198
         },
         "Near-full": {
@@ -40,31 +40,31 @@
       },
       "svm": {
         "Center": {
-          "recall": 0.7291,
+          "recall": 0.8785,
           "n": 502
         },
         "Donut": {
-          "recall": 0.55,
+          "recall": 0.6,
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.6654,
+          "recall": 0.6824,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.8972,
+          "recall": 0.9046,
           "n": 2003
         },
         "Local": {
-          "recall": 0.3876,
+          "recall": 0.4007,
           "n": 614
         },
         "Random": {
-          "recall": 0.8372,
+          "recall": 0.8605,
           "n": 86
         },
         "Scratch": {
-          "recall": 0.0707,
+          "recall": 0.101,
           "n": 198
         },
         "Near-full": {
@@ -74,35 +74,35 @@
       }
     },
     "44다이 2×2 구역": {
-      "cnn_accuracy": 0.7832,
-      "svm_accuracy": 0.7873,
+      "cnn_accuracy": 0.7845,
+      "svm_accuracy": 0.8081,
       "cnn": {
         "Center": {
-          "recall": 0.7749,
+          "recall": 0.9402,
           "n": 502
         },
         "Donut": {
-          "recall": 0.675,
+          "recall": 0.6,
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.7506,
+          "recall": 0.6964,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.9601,
+          "recall": 0.9636,
           "n": 2003
         },
         "Local": {
-          "recall": 0.4332,
+          "recall": 0.4625,
           "n": 614
         },
         "Random": {
-          "recall": 0.7674,
+          "recall": 0.4884,
           "n": 86
         },
         "Scratch": {
-          "recall": 0.3384,
+          "recall": 0.3131,
           "n": 198
         },
         "Near-full": {
@@ -112,31 +112,31 @@
       },
       "svm": {
         "Center": {
-          "recall": 0.751,
+          "recall": 0.8685,
           "n": 502
         },
         "Donut": {
-          "recall": 0.65,
+          "recall": 0.725,
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.7312,
+          "recall": 0.7498,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.9656,
+          "recall": 0.9626,
           "n": 2003
         },
         "Local": {
-          "recall": 0.5179,
+          "recall": 0.5489,
           "n": 614
         },
         "Random": {
-          "recall": 0.8605,
+          "recall": 0.8256,
           "n": 86
         },
         "Scratch": {
-          "recall": 0.2727,
+          "recall": 0.2879,
           "n": 198
         },
         "Near-full": {
@@ -146,69 +146,69 @@
       }
     },
     "44다이 3×3 구역": {
-      "cnn_accuracy": 0.802,
-      "svm_accuracy": 0.8191,
+      "cnn_accuracy": 0.8181,
+      "svm_accuracy": 0.8293,
       "cnn": {
         "Center": {
-          "recall": 0.7729,
+          "recall": 0.9363,
           "n": 502
         },
         "Donut": {
-          "recall": 0.7,
+          "recall": 0.675,
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.78,
+          "recall": 0.7219,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.9646,
+          "recall": 0.9725,
           "n": 2003
         },
         "Local": {
-          "recall": 0.4707,
+          "recall": 0.5651,
           "n": 614
         },
         "Random": {
-          "recall": 0.8605,
+          "recall": 0.7674,
           "n": 86
         },
         "Scratch": {
-          "recall": 0.404,
+          "recall": 0.4192,
           "n": 198
         },
         "Near-full": {
-          "recall": 0.5,
+          "recall": 0.75,
           "n": 4
         }
       },
       "svm": {
         "Center": {
-          "recall": 0.749,
+          "recall": 0.9044,
           "n": 502
         },
         "Donut": {
-          "recall": 0.7,
+          "recall": 0.775,
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.7777,
+          "recall": 0.7545,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.9666,
+          "recall": 0.9626,
           "n": 2003
         },
         "Local": {
-          "recall": 0.6287,
+          "recall": 0.6205,
           "n": 614
         },
         "Random": {
-          "recall": 0.8837,
+          "recall": 0.814,
           "n": 86
         },
         "Scratch": {
-          "recall": 0.3687,
+          "recall": 0.4495,
           "n": 198
         },
         "Near-full": {
@@ -221,7 +221,7 @@
   "scratch": {
     "n": 198,
     "raw_fail_cells": 140.39898681640625,
-    "core_fail_cells": 61.49494934082031,
-    "core_empty_share": 0.17676767706871033
+    "core_fail_cells": 66.40403747558594,
+    "core_empty_share": 0.0
   }
 }

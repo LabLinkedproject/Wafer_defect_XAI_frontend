@@ -1,15 +1,21 @@
 {
   "judged": 459686,
-  "kept": 1757,
+  "kept": 7751,
   "per_class": {
-    "Center": 505,
-    "Donut": 0,
-    "Edge-Loc": 325,
-    "Edge-Ring": 904,
-    "Local": 16,
-    "Random": 7,
+    "Center": 0,
+    "Donut": 65,
+    "Edge-Loc": 0,
+    "Edge-Ring": 6000,
+    "Local": 0,
+    "Random": 0,
     "Scratch": 0,
-    "Near-full": 0,
+    "Near-full": 1686,
     "Normal": 0
-  }
+  },
+  "expected_precision": {
+    "Donut": 0.95,
+    "Edge-Ring": 0.95,
+    "Near-full": 0.957
+  },
+  "max_rss_mb": 543
 }
