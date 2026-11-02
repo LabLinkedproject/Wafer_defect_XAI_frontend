@@ -207,7 +207,7 @@ def analyze(dies, spec, defects, answers=None, target=None) -> dict:
     return {
         "engines": ENGINES,
         "spec": {"diameter_mm": round(spec["diameter_mm"], 1), "pitch_mm": spec["pitch_mm"],
-                 "edge_excl_mm": spec["edge_excl_mm"], "die_count": len(dies), "grid": spec["grid"],
+                 "min_die_area": spec["min_die_area"], "die_count": len(dies), "grid": spec["grid"],
                  "active_radius_mm": round(active_radius(spec), 2)},
         "dies": die_rows,
         "zones": zones, "sectors": sectors,

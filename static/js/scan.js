@@ -208,7 +208,7 @@
   function renderPlan() {
     const sp = plan.spec;
     $("specLine").textContent =
-      `${sp.diameter_mm.toFixed(1)} mm (8.5인치) · 다이 ${sp.die_count}개 · 피치 ${sp.pitch_mm} mm · 스캔 ${plan.order.length}지점`;
+      `${sp.diameter_mm} mm · 다이 ${sp.die_count}개 · 피치 ${sp.pitch_mm} mm · 스캔 ${plan.order.length}지점`;
     $("pitchHint").textContent = sp.count_ok ? "" :
       `현재 피치로는 다이가 ${sp.die_count}개입니다 (기대 ${sp.expected_dies}). 실측 피치를 확인하세요.`;
     $("boundsInfo").textContent = `웨이퍼 중심 ±${plan.bounds_mm} mm`;

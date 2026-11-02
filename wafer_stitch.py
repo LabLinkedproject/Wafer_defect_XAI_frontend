@@ -21,11 +21,13 @@ import time
 import cv2
 import numpy as np
 
+from wafer_model import WAFER_MODEL
+
 WORK_SCALE = 0.5           # 카메라 모델 측정용 축소
 SIGMA_RATIO = 0.24         # 합성 가중치 폭 (영상 높이 대비)
 MAX_RADIUS_RATIO = 0.62    # 합성에 쓰는 최대 반경 (영상 높이 대비). 바깥은 왜곡·감광이 크다
 MIN_IMAGES = 8
-WAFER_DIAMETER_MM = 215.9
+WAFER_DIAMETER_MM = WAFER_MODEL["diameter_mm"]
 
 
 def _flatfield(stack: np.ndarray, sigma: float) -> np.ndarray:

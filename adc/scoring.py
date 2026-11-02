@@ -125,7 +125,7 @@ def extract_features(dies: list[dict], weights: dict[int, float], total_defect_d
         axis = vecs[:, 1]
         along = dxy @ axis
         across = np.abs(dxy @ np.array([-axis[1], axis[0]]))
-        pitch = abs(dies[0]["x_mm"] - dies[1]["x_mm"]) or 24.0
+        pitch = abs(dies[0]["x_mm"] - dies[1]["x_mm"])
         near = w[across <= pitch * 0.75].sum() / wsum
         span = float(along.max() - along.min())
         f["line_fit"] = float(near * min(1.0, span / (pitch * 5)))

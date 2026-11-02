@@ -11,7 +11,7 @@
 <header class="topbar">
   <div class="title">
     <h1>웨이퍼 모델 스캔 콘솔</h1>
-    <div class="subtitle" id="specLine">8.5인치 · 44다이 모델</div>
+    <div class="subtitle" id="specLine">270 mm · 44다이 모델</div>
   </div>
   <div class="chips">
     <span class="chip" id="chipGpio">GPIO</span>
@@ -71,7 +71,7 @@
             <option value="1">1 mm</option>
             <option value="5">5 mm</option>
             <option value="10" selected>10 mm</option>
-            <option value="24">24 mm (1다이)</option>
+            <option value="32">32 mm (1다이)</option>
             <option value="50">50 mm</option>
           </select>
           <button class="btn jog" data-axis="x" data-dir="1">X+ ▶</button>
@@ -136,5 +136,7 @@
 
 <script src="{{ url_for('static', filename='js/wafer_view.js') }}"></script>
 <script src="{{ url_for('static', filename='js/scan.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/training_badge.css') }}">
+<script src="{{ url_for('static', filename='js/training_badge.js') }}"></script>
 </body>
 </html>

@@ -63,7 +63,7 @@
 
   function renderHeader() {
     const sp = S.spec;
-    $("spec-line").textContent = `${sp.diameter_mm} mm (8.5인치) · ${sp.die_count}다이 · 피치 ${sp.pitch_mm} mm · ADC + XAI 공정 피드백`;
+    $("spec-line").textContent = `${sp.diameter_mm} mm · ${sp.die_count}다이 · 피치 ${sp.pitch_mm} mm · ADC + XAI 공정 피드백`;
     const sel = $("scenario");
     if (!sel.options.length) {
       sel.innerHTML = S.scenarios.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");

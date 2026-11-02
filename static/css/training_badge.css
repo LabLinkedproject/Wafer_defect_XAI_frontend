@@ -1,0 +1,7 @@
+/* 모든 화면에 뜨는 학습 상태 표시 */
+.train-badge { position: fixed; right: 12px; bottom: 12px; z-index: 50; display: flex; align-items: center; gap: 7px; padding: 6px 12px;
+  border-radius: 999px; font: 600 .8rem -apple-system, "Noto Sans KR", sans-serif; color: #fff; background: #7f8c8d; text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+.train-badge[data-state=running] { background: #1a8a4a; }
+.train-badge[data-state=stalled] { background: #b36b00; }
+.train-badge[data-state=stopped] { background: #c0392b; }

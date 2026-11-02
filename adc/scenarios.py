@@ -27,10 +27,15 @@ def _put(out, die, dtype, count):
     out[die["id"]][dtype] += count
 
 
-def _line(dies, out, count=2, slope=0.55, offset=-10.0):
+def _pitch(dies) -> float:
+    return abs(dies[0]["x_mm"] - dies[1]["x_mm"])
+
+
+def _line(dies, out, count=2, slope=0.55, offset=-0.4):
+    p = _pitch(dies)
     for d in dies:
-        dist = abs(d["y_mm"] - (slope * d["x_mm"] + offset)) / math.hypot(1, slope)
-        if dist <= 10:
+        dist = abs(d["y_mm"] - (slope * d["x_mm"] + offset * p)) / math.hypot(1, slope)
+        if dist <= 0.4 * p:
             _put(out, d, "scratch", count)
 
 
@@ -68,12 +73,14 @@ def generate(name: str, dies: list[dict]) -> dict[int, dict]:
                 _put(out, d, "particle", rng.choice((1, 2)))
     elif name == "edge_loc":
         for d in dies:
-            if d["zone"] == "edge" and d["x_mm"] > 20 and d["y_mm"] > -40:
+            if d["zone"] == "edge" and d["x_mm"] > 0.8 * _pitch(dies) and d["y_mm"] > -1.6 * _pitch(dies):
                 _put(out, d, "particle", 3 if d["rho"] > 0.9 else 2)
     elif name == "local":
+        p = _pitch(dies)
         for d in dies:
-            if math.hypot(d["x_mm"] + 36, d["y_mm"] - 12) < 34:
-                _put(out, d, "stain", 3 if math.hypot(d["x_mm"] + 36, d["y_mm"] - 12) < 20 else 1)
+            r = math.hypot(d["x_mm"] + 1.42 * p, d["y_mm"] - 0.47 * p) / p
+            if r < 1.34:
+                _put(out, d, "stain", 3 if r < 0.79 else 1)
     elif name == "random":
         for d in rng.sample(dies, 11):
             _put(out, d, "particle", rng.choice((1, 1, 2, 3)))

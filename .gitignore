@@ -41,3 +41,11 @@ scan_config.json
 
 # 엔지니어 판정 기록 (재학습 라벨 후보, 런타임 데이터)
 adc_feedback.jsonl
+
+# 학습 환경과 데이터 (training/prepare_data.py 로 재생성, 모델 파일만 커밋)
+venv-train/
+datasets/
+models/*.pt
+models/*.log
+models/progress_*.json
+models/job_progress.json

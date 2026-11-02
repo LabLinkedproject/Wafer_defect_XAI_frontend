@@ -1,46 +1,57 @@
 """
 wafer_model.py
-실물 스캔용 웨이퍼 모델 규격: 8.5인치, 엣지 제외 44다이.
+실물 웨이퍼 모형의 규격. 기준은 직접 제작한 도안(reports/wafer_model, DXF 생성 코드)이다.
 
-다이 배치는 8×8 짝수 격자에서 '다이 네 모서리가 모두 유효 반경 안에 드는 칸'만 남긴 것이다.
+은경 밀러 아크릴 2 mm, 지름 270 mm, 다이 32 mm, 6시 방향 노치(깊이 1.5 mm, 폭 2 mm).
+스크라이브 라인이 웨이퍼 중심을 지나는 짝수 격자다.
+
+검사 대상은 칸 면적의 99 % 이상이 웨이퍼 안에 있는 다이 44개다.
     행별 다이 수 (위 → 아래): 2, 6, 6, 8, 8, 6, 6, 2  = 44
-중앙 다이가 있는 홀수 격자로는 상하좌우 대칭 44개가 나올 수 없으므로(1 + 4k 꼴) 짝수 격자가 유일한 대칭 배치다.
-
-피치는 합성 웨이퍼 맵에서 측정했다: 반지름/피치 ≈ 4.2 → 1인치(25.4 mm) 피치이면 44개가 정확히 성립한다.
-유효 반경 / 피치 가 4.243 ~ 4.472 범위면 44개가 유지되고, 벗어나면 다이 수가 달라져 시작 시 경고한다.
+온전한 다이는 40개이고, 나머지 4개는 바깥 모서리만 0.76 mm 잘린 다이(면적 99.9 %)다.
+그 밖의 가장자리 칸은 면적 91 % 이하의 부분 다이라 제외한다.
 """
 from __future__ import annotations
 import math
 
-INCH_MM = 25.4
+import numpy as np
 
 WAFER_MODEL = {
-    "name":           "8.5inch / 44-die model",
-    "diameter_mm":    8.5 * INCH_MM,       # 215.9
-    "edge_excl_mm":   0.1,                 # 가장자리 제외 폭. 44개 다이가 웨이퍼 끝까지 닿는 배치
-    "pitch_mm":       25.4,                # 다이 피치. 합성 맵 측정값 25.7 mm 와 44다이 조건에서 1인치로 결정
+    "name":           "270 mm / 44-die model",
+    "material":       "은경 밀러 아크릴 2 mm",
+    "diameter_mm":    270.0,
+    "pitch_mm":       32.0,                # 스크라이브 라인 간격 = 다이 크기
+    "notch_depth_mm": 1.5,                 # 6시 방향 V 노치
+    "notch_width_mm": 2.0,
+    "notch_clock":    6,
+    "min_die_area":   0.99,                # 다이 칸 면적 중 웨이퍼 안에 든 비율이 이 이상이면 검사 대상
     "grid":           8,                   # 짝수 격자 한 변 칸 수
     "expected_dies":  44,
 }
 
 
 def active_radius(spec=WAFER_MODEL) -> float:
-    return spec["diameter_mm"] / 2 - spec["edge_excl_mm"]
+    return spec["diameter_mm"] / 2
+
+
+def die_area_fraction(cx: float, cy: float, spec=WAFER_MODEL, samples: int = 200) -> float:
+    """다이 칸 면적 중 웨이퍼 원 안에 든 비율."""
+    p = spec["pitch_mm"]
+    u = (np.arange(samples) + 0.5) / samples - 0.5
+    xx, yy = np.meshgrid(cx + u * p, cy + u * p)
+    return float((xx ** 2 + yy ** 2 <= active_radius(spec) ** 2).mean())
 
 
 def die_layout(spec=WAFER_MODEL) -> list[dict]:
     """다이 목록. 좌표는 웨이퍼 중심 기준 mm (오른쪽 +x, 위쪽 +y).
     row 0 = 맨 위, col 0 = 맨 왼쪽. id 는 위→아래, 왼→오른 순서로 1부터."""
-    n, p, r = spec["grid"], spec["pitch_mm"], active_radius(spec)
+    n, p = spec["grid"], spec["pitch_mm"]
     half = n / 2
     dies = []
     for row in range(n):
         cy = (half - row - 0.5) * p
         for col in range(n):
             cx = (col - half + 0.5) * p
-            # 다이의 가장 바깥 모서리까지 거리
-            far = math.hypot(abs(cx) + p / 2, abs(cy) + p / 2)
-            if far <= r:
+            if die_area_fraction(cx, cy, spec) >= spec["min_die_area"]:
                 dies.append({"row": row, "col": col, "x_mm": round(cx, 3), "y_mm": round(cy, 3)})
     for i, d in enumerate(dies, 1):
         d["id"] = i
@@ -82,6 +93,6 @@ def summary(spec=WAFER_MODEL) -> dict:
 
 if __name__ == "__main__":
     s = summary()
-    print(f"{s['name']}: 지름 {s['diameter_mm']:.1f} mm, 유효 반경 {s['active_radius_mm']} mm, 피치 {s['pitch_mm']} mm")
+    print(f"{s['name']}: 지름 {s['diameter_mm']:.1f} mm, 반경 {s['active_radius_mm']} mm, 피치 {s['pitch_mm']} mm")
     print(f"다이 {s['die_count']}개 (기대 {s['expected_dies']}) 행별 {s['row_counts']}")
     print(f"다이 중심 범위 X {s['extent_mm']['x']}  Y {s['extent_mm']['y']}")

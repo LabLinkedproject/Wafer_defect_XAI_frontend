@@ -18,6 +18,7 @@ from wafer_spec import WAFER_SPEC
 import scan_config
 from scan_routes import create_scan_blueprint
 from adc.routes import create_adc_blueprint
+from training_routes import create_training_blueprint
 
 
 CAPTURES_DIR = "captures"
@@ -245,6 +246,7 @@ def _shrink(frame, width):
 camera = CameraManager()
 app.register_blueprint(create_scan_blueprint(camera))   # /scan 콘솔 + 갠트리·촬영 API
 app.register_blueprint(create_adc_blueprint())          # /analysis ADC + XAI 대시보드 API
+app.register_blueprint(create_training_blueprint())     # /training 학습 상태
 
 
 def _mjpeg_stream(get_frame_fn, stream_name):
