@@ -8,7 +8,6 @@ training/export.py
 from __future__ import annotations
 import json
 import os
-import shutil
 import sys
 import time
 
@@ -25,28 +24,30 @@ CKPT = "models/wafernet.pt"
 CKPT_B = "models/wafernet_b.pt"
 ONNX = "models/wafernet.onnx"
 META = "models/wafernet.json"
+OPERATING = "models/operating.json"
+METRICS = "models/wafernet_metrics.json"
 
 
 def choose():
-    """추가 라벨 모델은 검증 점수가 더 높을 때만 쓴다. 시험 분할로 고르지 않는다."""
-    a = torch.load(CKPT)
-    b = torch.load(CKPT_B) if os.path.exists(CKPT_B) else None
-    return (b, "b") if b and b["val_score"] > a["val_score"] else (a, "a")
+    """training.tune 이 검증 분할의 실사용 입력으로 고른 모델과 판정선을 쓴다."""
+    with open(OPERATING) as f:
+        op = json.load(f)
+    return torch.load(CKPT_B if op["variant"] == "b" else CKPT), op
 
 
 def main():
-    ck, tag = choose()
+    ck, op = choose()
+    tag = op["variant"]
     print("선택 모델", tag, "검증 점수", ck["val_score"])
-    shutil.copy(f"models/metrics_{tag}.json", "models/wafernet_metrics.json")
+    with open(f"models/metrics_{tag}.json") as f:
+        durable.write_json(METRICS, {**json.load(f), "operating": op["test"]})
     net = WaferNet(len(ck["patterns"]))
     net.load_state_dict(ck["state"])
     net.eval()
     x = torch.rand(1, 3, R.SIZE, R.SIZE)
     torch.onnx.export(net, (x,), ONNX, opset_version=13, input_names=["input"], output_names=["logit"], dynamo=False)
-    with open(f"models/calibration_{tag}.json") as f:
-        cal = json.load(f)
     durable.write_json(META, {"patterns": ck["patterns"], "epoch": ck["epoch"], "variant": tag, "size": R.SIZE, "cell_mm": R.CELL_MM,
-                              "cells_per_die": R.CELLS_PER_DIE, **cal})
+                              "cells_per_die": R.CELLS_PER_DIE, "temperature": op["temperature"], "thresholds": op["thresholds"]})
     dnn = cv2.dnn.readNetFromONNX(ONNX)
     worst = 0.0
     for _ in range(20):

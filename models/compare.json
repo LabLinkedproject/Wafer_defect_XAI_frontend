@@ -2,11 +2,11 @@
   "test_maps": 4738,
   "conditions": {
     "44다이 판정": {
-      "cnn_accuracy": 0.6921,
+      "cnn_accuracy": 0.7035,
       "svm_accuracy": 0.7383,
       "cnn": {
         "Center": {
-          "recall": 0.8327,
+          "recall": 0.8347,
           "n": 502
         },
         "Donut": {
@@ -14,15 +14,15 @@
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.6476,
+          "recall": 0.4756,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.8582,
+          "recall": 0.9765,
           "n": 2003
         },
         "Local": {
-          "recall": 0.3485,
+          "recall": 0.4007,
           "n": 614
         },
         "Random": {
@@ -30,7 +30,7 @@
           "n": 86
         },
         "Scratch": {
-          "recall": 0.202,
+          "recall": 0.2323,
           "n": 198
         },
         "Near-full": {
@@ -74,35 +74,35 @@
       }
     },
     "44다이 2×2 구역": {
-      "cnn_accuracy": 0.7845,
+      "cnn_accuracy": 0.7588,
       "svm_accuracy": 0.8081,
       "cnn": {
         "Center": {
-          "recall": 0.9402,
+          "recall": 0.9303,
           "n": 502
         },
         "Donut": {
-          "recall": 0.6,
+          "recall": 0.575,
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.6964,
+          "recall": 0.5515,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.9636,
+          "recall": 0.9785,
           "n": 2003
         },
         "Local": {
-          "recall": 0.4625,
+          "recall": 0.4935,
           "n": 614
         },
         "Random": {
-          "recall": 0.4884,
+          "recall": 0.593,
           "n": 86
         },
         "Scratch": {
-          "recall": 0.3131,
+          "recall": 0.3788,
           "n": 198
         },
         "Near-full": {
@@ -146,35 +146,35 @@
       }
     },
     "44다이 3×3 구역": {
-      "cnn_accuracy": 0.8181,
+      "cnn_accuracy": 0.7885,
       "svm_accuracy": 0.8293,
       "cnn": {
         "Center": {
-          "recall": 0.9363,
+          "recall": 0.9283,
           "n": 502
         },
         "Donut": {
-          "recall": 0.675,
+          "recall": 0.6,
           "n": 40
         },
         "Edge-Loc": {
-          "recall": 0.7219,
+          "recall": 0.584,
           "n": 1291
         },
         "Edge-Ring": {
-          "recall": 0.9725,
+          "recall": 0.9835,
           "n": 2003
         },
         "Local": {
-          "recall": 0.5651,
+          "recall": 0.5782,
           "n": 614
         },
         "Random": {
-          "recall": 0.7674,
+          "recall": 0.7558,
           "n": 86
         },
         "Scratch": {
-          "recall": 0.4192,
+          "recall": 0.5,
           "n": 198
         },
         "Near-full": {
