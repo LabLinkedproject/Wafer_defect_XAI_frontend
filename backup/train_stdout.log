@@ -1,0 +1,35 @@
+파라미터 47352 학습 28510 검증 3800 시험 5705 pos_weight [1.899999976158142, 2.200000047683716, 1.899999976158142, 2.200000047683716, 1.100000023841858, 12.0, 1.0, 12.0]
+{'epoch': 1, 'loss': 0.7449, 'val_die_f1': 0.636, 'val_full_f1': 0.6468, 'minutes': 1.4}
+{'epoch': 2, 'loss': 0.4843, 'val_die_f1': 0.6025, 'val_full_f1': 0.6647, 'minutes': 2.7}
+{'epoch': 3, 'loss': 0.3771, 'val_die_f1': 0.5736, 'val_full_f1': 0.6867, 'minutes': 4.1}
+{'epoch': 4, 'loss': 0.3318, 'val_die_f1': 0.5814, 'val_full_f1': 0.784, 'minutes': 5.4}
+{'epoch': 5, 'loss': 0.309, 'val_die_f1': 0.7049, 'val_full_f1': 0.8335, 'minutes': 6.8}
+{'epoch': 6, 'loss': 0.293, 'val_die_f1': 0.7236, 'val_full_f1': 0.8429, 'minutes': 8.2}
+{'epoch': 7, 'loss': 0.2843, 'val_die_f1': 0.7335, 'val_full_f1': 0.8523, 'minutes': 9.5}
+{'epoch': 8, 'loss': 0.2756, 'val_die_f1': 0.73, 'val_full_f1': 0.8868, 'minutes': 10.9}
+{'epoch': 9, 'loss': 0.2664, 'val_die_f1': 0.7414, 'val_full_f1': 0.8635, 'minutes': 12.3}
+{'epoch': 10, 'loss': 0.2617, 'val_die_f1': 0.7649, 'val_full_f1': 0.9198, 'minutes': 13.6}
+{'epoch': 11, 'loss': 0.2553, 'val_die_f1': 0.7428, 'val_full_f1': 0.9025, 'minutes': 15.0}
+{'epoch': 12, 'loss': 0.252, 'val_die_f1': 0.7374, 'val_full_f1': 0.9121, 'minutes': 16.4}
+{'epoch': 13, 'loss': 0.2466, 'val_die_f1': 0.7832, 'val_full_f1': 0.9278, 'minutes': 17.8}
+{'epoch': 14, 'loss': 0.243, 'val_die_f1': 0.7529, 'val_full_f1': 0.9276, 'minutes': 19.2}
+{'epoch': 15, 'loss': 0.2399, 'val_die_f1': 0.7481, 'val_full_f1': 0.9296, 'minutes': 20.6}
+{'epoch': 16, 'loss': 0.238, 'val_die_f1': 0.7829, 'val_full_f1': 0.9322, 'minutes': 22.1}
+{'epoch': 17, 'loss': 0.2315, 'val_die_f1': 0.7901, 'val_full_f1': 0.9385, 'minutes': 23.5}
+{'epoch': 18, 'loss': 0.2306, 'val_die_f1': 0.7831, 'val_full_f1': 0.9399, 'minutes': 25.0}
+{'epoch': 19, 'loss': 0.2277, 'val_die_f1': 0.7871, 'val_full_f1': 0.9458, 'minutes': 26.5}
+{'epoch': 20, 'loss': 0.2244, 'val_die_f1': 0.7636, 'val_full_f1': 0.9535, 'minutes': 28.1}
+{'epoch': 21, 'loss': 0.223, 'val_die_f1': 0.8112, 'val_full_f1': 0.9487, 'minutes': 29.6}
+{'epoch': 22, 'loss': 0.2224, 'val_die_f1': 0.8068, 'val_full_f1': 0.9433, 'minutes': 31.2}
+{'epoch': 23, 'loss': 0.2175, 'val_die_f1': 0.8038, 'val_full_f1': 0.9484, 'minutes': 32.8}
+{'epoch': 24, 'loss': 0.2174, 'val_die_f1': 0.7864, 'val_full_f1': 0.9546, 'minutes': 34.3}
+{'epoch': 25, 'loss': 0.2173, 'val_die_f1': 0.8031, 'val_full_f1': 0.9509, 'minutes': 35.8}
+{'epoch': 26, 'loss': 0.214, 'val_die_f1': 0.8017, 'val_full_f1': 0.9553, 'minutes': 37.3}
+{'epoch': 27, 'loss': 0.2161, 'val_die_f1': 0.8052, 'val_full_f1': 0.9514, 'minutes': 38.8}
+{'epoch': 28, 'loss': 0.2141, 'val_die_f1': 0.8061, 'val_full_f1': 0.9514, 'minutes': 40.4}
+{'epoch': 29, 'loss': 0.2118, 'val_die_f1': 0.8062, 'val_full_f1': 0.9524, 'minutes': 41.9}
+{'epoch': 30, 'loss': 0.2123, 'val_die_f1': 0.8069, 'val_full_f1': 0.9523, 'minutes': 43.5}
+전면 맵 (원본 잡음) {'exact_match': 0.5004, 'macro_f1': 0.9028, 'normal_correct': 0.88}
+전면 맵 (잡음 제거) {'exact_match': 0.8025, 'macro_f1': 0.9544, 'normal_correct': 1.0}
+44다이 판정 {'exact_match': 0.4726, 'macro_f1': 0.8004, 'normal_correct': 1.0}
+44다이 + 산발 결함 4 % {'exact_match': 0.4445, 'macro_f1': 0.797, 'normal_correct': 0.9333}
