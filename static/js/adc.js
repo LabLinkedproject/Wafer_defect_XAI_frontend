@@ -12,6 +12,7 @@
   let mode = "status";
   let selected = null;
   let imgToken = 0;
+  let inputMode = null;      // real | sim. 맵이 있으면 처음에는 실측 맵을 보여 준다
 
   async function api(url, body) {
     const opt = body === undefined ? {} : {
@@ -103,6 +104,27 @@
 
   // ── 입력 이미지 ──────────────────────────────────────────────
   function renderInput() {
+    const map = S.wafer_map;
+    const usable = !!(map && map.wafer);
+    if (inputMode === null || (inputMode === "real" && !usable)) inputMode = usable ? "real" : "sim";
+    const real = inputMode === "real";
+    document.querySelectorAll("#input-modes button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.v === inputMode);
+      b.disabled = b.dataset.v === "real" && !usable;
+    });
+    $("input-title").textContent = real ? "웨이퍼 맵" : "입력 이미지";
+    $("real-view").hidden = !real;
+    $("input-img").hidden = real;
+    $("input-overlay").style.display = real ? "none" : "";
+    $("overlay-wrap").hidden = real;
+    $("grid-wrap").hidden = !real;
+    if (real) {
+      WaferView.draw($("real-view"), map, { grid: $("show-grid").checked, selected: selected });
+      const cov = map.coverage_pct;
+      $("input-note").textContent = `촬영 ${map.images}장을 한 장으로 합성 · 웨이퍼 커버리지 ${cov}%` +
+        (cov < 98 ? ". 스캔 콘솔에서 정렬 후 재스캔하면 전체를 담습니다." : "");
+      return;
+    }
     const img = $("input-img");
     const token = ++imgToken;
     const next = new Image();
@@ -126,7 +148,7 @@
     }
     ov.innerHTML = html;
     const counts = Object.values(S.types).filter((t) => t.count).map((t) => `${t.ko} ${t.dies}다이`);
-    $("input-note").textContent = `검출 분포로 만든 합성 이미지입니다${counts.length ? ` · ${counts.join(", ")}` : ""}. 실제 촬영본은 다이 상세에서 볼 수 있습니다.`;
+    $("input-note").textContent = `검출 분포로 만든 시뮬레이션 이미지입니다${counts.length ? ` · ${counts.join(", ")}` : ""}.`;
   }
 
   // ── 웨이퍼 맵 ────────────────────────────────────────────────
@@ -211,11 +233,11 @@
       body.innerHTML = '<p class="empty">웨이퍼 맵에서 다이를 선택하세요. 결함을 바꾸면 판정·근거·원인 확률이 바로 다시 계산됩니다.</p>';
       return;
     }
-    const scan = S.scan?.images?.[String(d.id)];
+    const canCrop = S.wafer_map?.wafer && S.wafer_map?.grid;
     const counts = Object.entries(d.counts).filter(([, v]) => v).map(([k, v]) => `${S.types[k].ko} ${v}`).join(", ") || "없음";
     const dose = (t, n, label) => `<button type="button" class="btn" data-edit="${t}" data-n="${n}">${label}</button>`;
     body.innerHTML = `
-      ${scan ? `<a href="/scans/${esc(scan.file)}" target="_blank" rel="noopener"><img class="die-photo" src="/scans/${esc(scan.thumb)}" alt="다이 ${d.id} 실제 촬영 이미지"></a><p class="note photo-note">최근 스캔 촬영본 (아래 결함은 ${S.session.edited ? "수정된 " : ""}시뮬레이션 입력값)</p>` : ""}
+      ${canCrop ? `<canvas class="die-photo" id="die-crop" width="320" height="320" role="img" aria-label="합성 맵의 다이 ${d.id} 위치"></canvas><p class="note photo-note">합성 맵의 이 다이 위치 (아래 결함은 ${S.session.edited ? "수정된 " : ""}시뮬레이션 입력값)</p>` : ""}
       <dl class="facts">
         <dt>다이</dt><dd>${d.id}번 (행 ${d.row + 1}, 열 ${d.col + 1})</dd>
         <dt>위치</dt><dd>${d.x_mm}, ${d.y_mm} mm</dd>
@@ -230,6 +252,7 @@
         ${dose("scratch", 2, "스크래치")}${dose("stain", 3, "스테인")}
         <button type="button" class="btn ghost" data-edit="" data-n="0" style="grid-column:1/-1">결함 없음으로</button>
       </div>`;
+    if (canCrop) WaferView.cropDie($("die-crop"), S.wafer_map, d.row, d.col, S.spec.grid);
     body.querySelectorAll("[data-edit]").forEach((b) => {
       b.onclick = () => act("/api/adc/die", { id: d.id, type: b.dataset.edit || null, count: Number(b.dataset.n) });
     });
@@ -439,6 +462,13 @@
   };
   $("show-zones").onchange = renderMap;
   $("show-overlay").onchange = renderInput;
+  $("show-grid").onchange = renderInput;
+  $("input-modes").onclick = (e) => {
+    const b = e.target.closest("button");
+    if (!b || b.disabled) return;
+    inputMode = b.dataset.v;
+    renderInput();
+  };
   $("show-xai-map").onclick = () => {
     mode = "xai";
     renderMap();

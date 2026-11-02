@@ -33,7 +33,7 @@
   // ── 모자이크 (44다이 배치) ───────────────────────────────────
   function buildMosaic() {
     const m = $("mosaic");
-    const n = plan.spec.grid;
+    const n = Math.max(...plan.order.map((d) => Math.max(d.row, d.col))) + 1;
     m.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
     m.innerHTML = "";
     const byPos = new Map(plan.order.map((d) => [`${d.row},${d.col}`, d]));
@@ -146,13 +146,13 @@
     $("btnStop").disabled = !busy;
 
     // 결과
-    $("scanDir").textContent = s.scan.dir ? `${s.scan.dir} · ${s.scan.count}장` : "아직 스캔 없음";
     let currentId = null;
     if (busy && j.name === "scan") {
       const m = /다이 (\d+)/.exec(j.message || "");
       if (m) currentId = Number(m[1]);
     }
     fillMosaic(s.scan.results, currentId);
+    renderMap(s, ready);
 
     const c = $("corners");
     if (s.scan.preview.length && c.dataset.n !== String(s.scan.preview.length)) {
@@ -162,6 +162,34 @@
         <figcaption>${p.name} (${p.gx}, ${p.gy})</figcaption></figure>`).join("");
     }
     drawMinimap();
+  }
+
+  // ── 웨이퍼 맵 ────────────────────────────────────────────────
+  let mapKey = null;
+  function renderMap(s, ready) {
+    const m = s.wafer_map;
+    $("btnMap").disabled = !(s.origin_set !== undefined && !s.job.busy);
+    $("btnAlign").disabled = !(ready && m?.wafer);
+    if (!m) return;
+    const key = `${m.dir}|${m.seconds}|${$("mapGrid").checked}`;
+    if (key === mapKey) return;
+    mapKey = key;
+    $("mapEmpty").hidden = true;
+    $("mapMeta").textContent = `${m.dir} · ${m.images}장 합성 · ${m.seconds}초`;
+    if (m.wafer) WaferView.draw($("mapView"), m, { grid: $("mapGrid").checked });
+    else $("mapView").innerHTML = `<img src="${m.url}" alt="합성 웨이퍼 맵" style="width:100%">`;
+    const w = m.wafer, g = m.grid, c = m.camera;
+    const rows = [["카메라 축척", `${c.px_per_mm_full} px/mm`], ["카메라 회전", `${c.rotation_deg}°`], ["시야", `${c.fov_mm[0]} × ${c.fov_mm[1]} mm`],
+                  ["겹침 일치도", `${m.overlap_ncc.before} → ${m.overlap_ncc.after}`]];
+    if (w) {
+      rows.push(["웨이퍼 커버리지", `${m.coverage_pct}%`], ["웨이퍼 중심", `${w.center_gantry_mm[0]}, ${w.center_gantry_mm[1]} mm`],
+                ["웨이퍼 반지름", `${w.radius_gantry_mm} mm`], ["원 맞춤 오차", `${w.fit_residual_px} px`]);
+    }
+    if (g) rows.push(["격자 피치", `${g.pitch_mm ?? "-"} mm`], ["격자 기울기", `${g.angle_deg}°`]);
+    $("mapFacts").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    $("mapHint").textContent = w && m.coverage_pct < 98
+      ? "웨이퍼 일부만 담겼습니다. '측정값으로 정렬'을 누른 뒤 다시 스캔하면 전체를 담습니다."
+      : "이음새 없이 합성됐습니다.";
   }
 
   function renderConfig() {
@@ -180,13 +208,13 @@
   function renderPlan() {
     const sp = plan.spec;
     $("specLine").textContent =
-      `${sp.diameter_mm.toFixed(1)} mm (8.5인치) · 다이 ${sp.die_count}개 · 피치 ${sp.pitch_mm} mm · 행별 ${sp.row_counts.join("-")}`;
+      `${sp.diameter_mm.toFixed(1)} mm (8.5인치) · 다이 ${sp.die_count}개 · 피치 ${sp.pitch_mm} mm · 스캔 ${plan.order.length}지점`;
     $("pitchHint").textContent = sp.count_ok ? "" :
       `현재 피치로는 다이가 ${sp.die_count}개입니다 (기대 ${sp.expected_dies}). 실측 피치를 확인하세요.`;
     $("boundsInfo").textContent = `웨이퍼 중심 ±${plan.bounds_mm} mm`;
     // 예상 시간: 이동(대략) + 대기
     const dwell = status ? status.config.dwell_s : 0.6;
-    const est = Math.round(sp.die_count * (dwell + 0.9) + 6);
+    const est = Math.round(plan.order.length * (dwell + 0.9) + 60);   // 이동 + 대기 + 맵 합성
     $("eta").textContent = `예상 약 ${Math.floor(est / 60)}분 ${est % 60}초`;
   }
 
@@ -216,9 +244,20 @@
   // ── 이벤트 ───────────────────────────────────────────────────
   $("btnScan").onclick = () => {
     clearMosaic();
-    act("/api/scan/start", {}, `44개 다이 스캔을 시작합니다. 갠트리 주변에 손이나 물건이 없는지 확인하세요.`);
+    act("/api/scan/start", {}, `${plan.order.length}지점 스캔을 시작합니다. 갠트리 주변에 손이나 물건이 없는지 확인하세요.`);
   };
   $("btnStop").onclick = () => act("/api/gantry/stop", {});
+  $("btnMap").onclick = () => act("/api/scan/map", {});
+  $("mapGrid").onchange = () => { mapKey = null; if (status) renderMap(status, !status.job.busy); };
+  $("btnAlign").onclick = async () => {
+    if (!confirm("맵에서 측정한 웨이퍼 중심과 크기로 스캔 경로를 다시 만듭니다.")) return;
+    try {
+      await api("/api/scan/align", {});
+      await refreshPlan();
+      poll();
+      showBanner(`정렬했습니다. 다음 스캔은 ${plan.order.length}장으로 웨이퍼 전체를 담습니다.`, true);
+    } catch (e) { /* 배너 */ }
+  };
   $("btnBounds").onclick = () => { $("corners").innerHTML = ""; $("corners").dataset.n = "0"; act("/api/scan/bounds", {}); };
   $("btnOrigin").onclick = () => act("/api/gantry/origin", {});
   $("btnWaferCenter").onclick = () => act("/api/gantry/wafer-center", {});

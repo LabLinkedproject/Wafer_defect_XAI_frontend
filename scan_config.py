@@ -17,6 +17,9 @@ DEFAULTS = {
     "wafer_sign_x": 1,
     "wafer_sign_y": 1,
     "pitch_mm": None,          # None 이면 wafer_model.WAFER_MODEL 값 사용
+    # 합성 맵에서 측정한 웨이퍼 반지름(갠트리 mm). 값이 있으면 웨이퍼 전체를 덮는 격자 경로로 스캔한다
+    "map_radius_mm": None,
+    "map_step_mm": 36.0,
     "rpm": 90.0,               # 프로토타입 기준 속도 (매핑 구현하며 점진 조정)
     "accel_rev": 0.5,
     "dwell_s": 0.6,            # 정지 후 흔들림이 가라앉을 때까지 대기

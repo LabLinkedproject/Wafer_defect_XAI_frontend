@@ -12,6 +12,7 @@ scan_service.py
     WAFER_GANTRY_DRY=1 GPIO 없이 동작 흉내 (화면·촬영 흐름 점검용, 위치 파일도 저장 안 함)
 """
 from __future__ import annotations
+import glob
 import os
 import sys
 import json
@@ -24,6 +25,7 @@ import cv2
 
 import scan_config
 import wafer_model
+import wafer_stitch
 
 MOTOR_DIR = os.environ.get("MOTOR_DIR", "/home/orangepi/motor_test")
 if MOTOR_DIR not in sys.path:
@@ -103,7 +105,32 @@ class ScanService:
             "job": dict(self.job),
             "scan": {"dir": self.scan["dir"], "count": len(self.scan["results"]),
                      "results": self.scan["results"], "preview": self.scan["preview"]},
+            "wafer_map": self.latest_map(),
         }
+
+    def _coverage_order(self, cx, cy, radius, step) -> list[dict]:
+        """웨이퍼 전체를 덮는 격자 촬영 경로 (지그재그). 사진 한 장의 쓸 수 있는 반경만큼 안쪽까지만 간다.
+        갠트리 범위를 넘는 지점은 범위 끝으로 당긴다. 카메라 시야가 넓어 끝 부분도 담을 수 있다."""
+        (xl, xh), (yl, yh) = gcli.limits("x"), gcli.limits("y")
+        reach = max(radius - 30.0, step)
+        n = int(reach // step)
+        out, idx = [], 1
+        for row, j in enumerate(range(n, -n - 1, -1)):
+            cols = list(range(-n, n + 1))
+            if row % 2:
+                cols.reverse()
+            for i in cols:
+                dx, dy = i * step, j * step
+                if dx * dx + dy * dy > reach * reach:
+                    continue
+                gx = round(min(xh, max(xl, cx + dx)), 2)
+                gy = round(min(yh, max(yl, cy + dy)), 2)
+                if out and (out[-1]["gx"], out[-1]["gy"]) == (gx, gy):
+                    continue
+                out.append({"id": idx, "row": row, "col": i + n, "x_mm": round(dx, 2), "y_mm": round(dy, 2),
+                            "gx": gx, "gy": gy})
+                idx += 1
+        return out
 
     def plan(self) -> dict:
         cfg = scan_config.load()
@@ -113,10 +140,12 @@ class ScanService:
         dies = wafer_model.die_layout(spec)
         order = wafer_model.scan_order(dies)
         cx, cy = float(cfg["wafer_center_x"]), float(cfg["wafer_center_y"])
+        if cfg.get("map_radius_mm"):
+            order = self._coverage_order(cx, cy, float(cfg["map_radius_mm"]), float(cfg["map_step_mm"]))
         sx, sy = int(cfg["wafer_sign_x"]), int(cfg["wafer_sign_y"])
         for d in order:
-            d["gx"] = round(cx + sx * d["x_mm"], 2)
-            d["gy"] = round(cy + sy * d["y_mm"], 2)
+            d["gx"] = d.get("gx", round(cx + sx * d["x_mm"], 2))
+            d["gy"] = d.get("gy", round(cy + sy * d["y_mm"], 2))
             d["in_limits"] = self._in_limits(d["gx"], d["gy"])
         p = spec["pitch_mm"]
         ext = max(max(abs(d["x_mm"]), abs(d["y_mm"])) for d in dies) + p / 2   # 다이 바깥 경계
@@ -132,24 +161,25 @@ class ScanService:
         }
 
     # ── 작업 실행 ──────────────────────────────────────────────────
-    def _run(self, name, fn, total=0):
+    def _run(self, name, fn, total=0, motion=True):
         with self._lock:
             if self.job["busy"]:
                 raise JobError(f"'{self.job['name']}' 작업이 진행 중입니다.")
-            if not self.gpio_access():
+            if motion and not self.gpio_access():
                 raise JobError("GPIO 권한이 없습니다. 터미널에서 한 번만 실행하세요: "
                                "sudo /home/orangepi/motor_test/install_gpio_access.sh")
-            if not self.state_writable():
+            if motion and not self.state_writable():
                 raise JobError(f"위치 파일({gcli.STATE_FILE})에 쓸 수 없습니다. "
                                "install_gpio_access.sh 를 실행하면 소유권이 정리됩니다.")
-            st = self._state()
+            st = self._state() if motion else None
             self._stop = False
             self.job.update(name=name, busy=True, message="시작", error=None, progress=0, total=total,
                             started=datetime.now().isoformat(timespec="seconds"), finished=None)
 
         def worker():
             try:
-                self._g = Gantry(dry=DRY, invert_m3=True, consumer="wafer_web")
+                if motion:
+                    self._g = Gantry(dry=DRY, invert_m3=True, consumer="wafer_web")
                 fn(self._g, st, scan_config.load())
                 if self._stop:
                     self.job["message"] = "정지됨 (위치는 저장됨)"
@@ -303,5 +333,53 @@ class ScanService:
                 return
             self.job["message"] = "웨이퍼 중심으로 복귀"
             self._move(g, st, prof, float(cfg["wafer_center_x"]), float(cfg["wafer_center_y"]))
-            self.job["message"] = f"스캔 완료: {len(self.scan['results'])}/{len(order)}장, {time.monotonic() - t0:.0f}초"
+            scan_s = time.monotonic() - t0
+            self._make_map(out, len(self.scan["results"]))
+            self.job["message"] = f"스캔 완료: {len(self.scan['results'])}/{len(order)}장, {scan_s:.0f}초. 웨이퍼 맵 합성 완료"
         self._run("scan", fn, total=len(order))
+
+    # ── 웨이퍼 맵 ──────────────────────────────────────────────────
+    def _make_map(self, scan_dir, n):
+        def log(msg):
+            self.job["message"] = f"웨이퍼 맵: {msg}"
+        if n < wafer_stitch.MIN_IMAGES:
+            raise JobError(f"합성에 필요한 사진이 부족합니다 ({n}장)")
+        wafer_stitch.build(scan_dir, log=log)
+
+    @staticmethod
+    def _full_scans():
+        """사진이 충분한 스캔 폴더 (최신순)"""
+        out = []
+        for path in sorted(glob.glob(os.path.join(SCAN_ROOT, "*_scan", "manifest.json")), reverse=True):
+            try:
+                with open(path) as f:
+                    if len(json.load(f).get("dies", [])) >= wafer_stitch.MIN_IMAGES:
+                        out.append(os.path.dirname(path))
+            except (OSError, ValueError):
+                continue
+        return out
+
+    def latest_map(self) -> dict | None:
+        return wafer_stitch.latest_map(SCAN_ROOT)
+
+    def build_latest_map(self):
+        """가장 최근 스캔으로 맵을 다시 합성한다. 모터를 움직이지 않는다."""
+        scans = self._full_scans()
+        if not scans:
+            raise JobError("합성할 스캔이 없습니다. 먼저 스캔을 실행하세요.")
+
+        def fn(g, st, cfg):
+            self._make_map(scans[0], 99)
+            self.job["message"] = "웨이퍼 맵 합성 완료"
+        self._run("map", fn, motion=False)
+
+    def apply_alignment(self) -> dict:
+        """맵에서 측정한 웨이퍼 중심·반지름을 스캔 설정에 적용한다. 다음 스캔은 웨이퍼 전체를 덮는다."""
+        if self.job["busy"]:
+            raise JobError("작업 중에는 바꿀 수 없습니다.")
+        m = self.latest_map()
+        w = (m or {}).get("wafer")
+        if not w:
+            raise JobError("맵에서 웨이퍼 외곽을 찾지 못해 정렬할 수 없습니다.")
+        cx, cy = w["center_gantry_mm"]
+        return scan_config.update(wafer_center_x=cx, wafer_center_y=cy, map_radius_mm=w["radius_gantry_mm"])

@@ -65,19 +65,27 @@
       <div class="grid g-input">
         <article class="card">
           <div class="card-head">
-            <h3>입력 이미지</h3>
-            <label class="switch"><input type="checkbox" id="show-overlay" checked> 검출 표시</label>
+            <h3 id="input-title">입력 이미지</h3>
+            <div class="segmented" id="input-modes" role="radiogroup" aria-label="입력 표시">
+              <button type="button" data-v="real">실측 맵</button>
+              <button type="button" data-v="sim">시뮬레이션</button>
+            </div>
           </div>
           <div class="wafer-image">
+            <div id="real-view" class="fill" hidden></div>
             <img id="input-img" alt="결함 분포를 반영한 합성 웨이퍼 입력 이미지">
             <svg id="input-overlay" viewBox="0 0 620 620" aria-hidden="true"></svg>
+          </div>
+          <div class="input-foot">
+            <label class="switch" id="overlay-wrap"><input type="checkbox" id="show-overlay" checked> 검출 표시</label>
+            <label class="switch" id="grid-wrap" hidden><input type="checkbox" id="show-grid" checked> 다이 격자</label>
           </div>
           <p class="note" id="input-note"></p>
         </article>
 
         <article class="card">
           <div class="card-head">
-            <h3>웨이퍼 맵</h3>
+            <h3>다이 판정 맵</h3>
             <div class="segmented" role="radiogroup" aria-label="맵 표시 방식" id="map-modes">
               <button type="button" data-mode="status" class="on">상태</button>
               <button type="button" data-mode="type">유형</button>
@@ -236,6 +244,7 @@
     </section>
   </main>
 
+  <script src="{{ url_for('static', filename='js/wafer_view.js') }}"></script>
   <script src="{{ url_for('static', filename='js/adc.js') }}"></script>
 </body>
 </html>

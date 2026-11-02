@@ -4,7 +4,6 @@ adc/session.py
 다이를 고치면 영상 근거는 다시 계산하되 현장 확인 답변은 유지한다. 새 사실이 들어오면 판단이 그대로 이어지게 하기 위해서다.
 """
 from __future__ import annotations
-import glob
 import json
 import os
 import threading
@@ -12,6 +11,7 @@ from datetime import datetime
 
 import scan_config
 import wafer_model
+import wafer_stitch
 from . import engine, render, scenarios, scoring
 from .knowledge import CHECKS, DEFECT_TYPES, PATTERNS
 
@@ -84,20 +84,6 @@ class Session:
             self.target = target if target in PATTERNS else None
             self._invalidate()
 
-    def latest_scan(self) -> dict | None:
-        """가장 최근 실제 스캔 이미지. 다이 인스펙터에서 합성 이미지 대신 보여 준다."""
-        for path in sorted(glob.glob(os.path.join(SCAN_ROOT, "*_scan", "manifest.json")), reverse=True):
-            try:
-                with open(path) as f:
-                    m = json.load(f)
-            except (OSError, json.JSONDecodeError):
-                continue
-            if m.get("dies"):
-                return {"dir": os.path.basename(os.path.dirname(path)), "started": m.get("started"),
-                        "count": len(m["dies"]),
-                        "images": {str(d["id"]): {"file": d["file"], "thumb": d["thumb"]} for d in m["dies"]}}
-        return None
-
     def state(self) -> dict:
         with self._lock:
             if self._cache is None:
@@ -110,7 +96,7 @@ class Session:
                 r["scenarios"] = [{"id": k, **v} for k, v in scenarios.SCENARIOS.items()]
                 self._cache = r
             res = dict(self._cache)
-            res["scan"] = self.latest_scan()
+            res["wafer_map"] = wafer_stitch.latest_map(SCAN_ROOT)
             return res
 
     def input_image(self) -> bytes:

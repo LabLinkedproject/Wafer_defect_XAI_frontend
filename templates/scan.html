@@ -109,17 +109,32 @@
     </div>
   </section>
 
-  <!-- 결과 모자이크 -->
+  <!-- 웨이퍼 맵 -->
   <section class="card mosaic-card">
     <div class="card-head">
-      <h2>스캔 결과</h2>
-      <span class="muted" id="scanDir">아직 스캔 없음</span>
+      <h2>웨이퍼 맵</h2>
+      <span class="muted" id="mapMeta">아직 합성된 맵이 없습니다</span>
     </div>
-    <div class="mosaic" id="mosaic"></div>
-    <p class="hint">칸을 누르면 원본(1920×1080)이 새 탭에서 열립니다. 번호는 다이 ID입니다.</p>
+    <div class="map-layout">
+      <div class="map-frame"><div id="mapView"></div><p class="empty-map" id="mapEmpty">스캔을 마치면 촬영본을 한 장의 웨이퍼로 자동 합성합니다.</p></div>
+      <div class="map-side">
+        <dl class="facts" id="mapFacts"></dl>
+        <div class="row wrap">
+          <button class="btn" id="btnMap">맵 다시 합성</button>
+          <button class="btn accent" id="btnAlign">측정값으로 정렬</button>
+        </div>
+        <label class="check"><input type="checkbox" id="mapGrid" checked> 다이 격자 표시</label>
+        <p class="hint" id="mapHint"></p>
+      </div>
+    </div>
+    <details class="shots">
+      <summary>개별 촬영본</summary>
+      <div class="mosaic" id="mosaic"></div>
+    </details>
   </section>
 </main>
 
+<script src="{{ url_for('static', filename='js/wafer_view.js') }}"></script>
 <script src="{{ url_for('static', filename='js/scan.js') }}"></script>
 </body>
 </html>

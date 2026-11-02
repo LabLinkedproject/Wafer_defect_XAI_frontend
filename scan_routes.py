@@ -85,6 +85,18 @@ def create_scan_blueprint(camera) -> Blueprint:
     def start():
         return call(svc.start_scan)
 
+    @bp.route("/api/scan/map", methods=["POST"])
+    def build_map():
+        return call(svc.build_latest_map)
+
+    @bp.route("/api/scan/align", methods=["POST"])
+    def align():
+        return call(svc.apply_alignment)
+
+    @bp.route("/api/scan/map")
+    def get_map():
+        return jsonify(svc.latest_map() or {})
+
     @bp.route("/api/scan/config", methods=["POST"])
     def config():
         d = request.get_json(silent=True) or {}
