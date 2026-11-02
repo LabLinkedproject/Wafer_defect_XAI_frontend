@@ -25,7 +25,7 @@ import training_status                                 # noqa: E402
 EPOCHS = "20"
 STEPS = [("fetch_wm811k", []), ("prepare_data", []), ("train", ["--epochs", EPOCHS]), ("evaluate", ["--tag", "a"]),
          ("pseudo_label", []), ("train", ["--epochs", EPOCHS, "--pseudo", "--out", "models/wafernet_b.pt"]),
-         ("evaluate", ["--ckpt", "models/wafernet_b.pt", "--tag", "b"]), ("baseline", []), ("export", [])]
+         ("evaluate", ["--ckpt", "models/wafernet_b.pt", "--tag", "b"]), ("baseline", []), ("export", []), ("compare", [])]
 STATE = "models/pipeline_state.json"
 LOCK = "models/pipeline.lock"
 DONE = "models/PIPELINE_DONE"

@@ -41,7 +41,9 @@ def per_class(pred, y, patterns):
 def main():
     labels, split, source, _, patterns = load_meta()
     g = Geometry()
-    net, _ = load_net("models/wafernet_b.pt", len(patterns))
+    with open("models/wafernet.json") as f:
+        variant = json.load(f)["variant"]
+    net, _ = load_net("models/wafernet_b.pt" if variant == "b" else "models/wafernet.pt", len(patterns))
     single = labels.sum(1) == 1
     tr = np.where((split == TRAIN) & (source == WM811K) & single)[0]
     te = np.where((split == TEST) & (source == WM811K) & single)[0]

@@ -14,7 +14,7 @@ training/prepare_data.py
 
 처리 순서
 1. 맵마다 웨이퍼 타원을 270 mm 원에 맞춘다. 다이 크기가 달라도 물리 위치가 같은 셀에 놓인다.
-2. 연결 크기로 패턴 구조와 잡음을 나눈다. 기준은 다이 수가 아니라 면적이라 맵 크기와 무관하다.
+2. 연결 크기로 패턴 구조와 잡음을 나눈다. 기준은 맵마다 잰 잡음 밀도로 정한다.
 3. 분할한다. WM-811K 는 파일 순서가 로트 순서이므로 연속 구간 단위로 나누고 경계의 웨이퍼를 버려
    같은 로트가 학습과 시험에 함께 들어가지 않게 한다. MixedWM38 은 동일 맵을 묶고 라벨 조합별로 층화한다.
 4. MixedWM38 의 Random 866장과 Near-full 149장은 수가 WM-811K 와 똑같아 같은 원본으로 보고,
@@ -41,8 +41,8 @@ OUT_DIR = "datasets/wafer270"
 MIXED_LABELS = ("Center", "Donut", "Edge-Loc", "Edge-Ring", "Local", "Near-full", "Scratch", "Random")
 WM811K_LABELS = ("Center", "Donut", "Edge-Loc", "Edge-Ring", "Local", "Random", "Scratch", "Near-full")
 DUPLICATED_IN_WM811K = ("Random", "Near-full")
-MIN_STRUCTURE_FRACTION = 16 / (np.pi * 26 ** 2)   # 지름 52다이 맵의 19 % 잡음을 95 % 거르는 16다이의 면적비
-MIN_STRUCTURE_DIES = 3
+NOISE_DENSITY = (0.03, 0.05, 0.08, 0.10, 0.15, 0.20)   # 독립 잡음을 모의해 잰 값. 잡음 잔류율 5 % 기준
+NOISE_MIN_SIZE = (3, 4, 5, 6, 10, 18)
 MIN_DIAMETER_DIES = 16        # 우리 다이 격자(지름 8칸)의 2배. 이보다 성기면 2×2 구역을 담지 못한다
 SUPER = 4                     # 재표본화 초과 표본
 SPLIT = (0.75, 0.10, 0.15)    # 학습 / 검증 / 시험
@@ -55,10 +55,20 @@ TRAIN, VAL, TEST = 0, 1, 2
 MIXED, WM811K = 0, 1
 
 
+def noise_threshold(p: float) -> int:
+    """잡음 밀도 p 에서 무작위 뭉침의 95 % 를 거르는 연결 크기. 뭉침 크기는 맵 크기가 아니라 밀도로 정해진다."""
+    return int(round(np.interp(p, NOISE_DENSITY, NOISE_MIN_SIZE)))
+
+
 def structure(fail: np.ndarray, area: float) -> np.ndarray:
-    """연결 크기가 작은 불량(배경 잡음)을 지운다. area: 웨이퍼 면적(다이 수)"""
+    """연결 크기가 작은 불량(배경 잡음)을 지운다. 잡음 밀도는 가장 큰 덩어리를 뺀 나머지로 잰다.
+    area: 웨이퍼 면적(다이 수)"""
     n, lab, stats, _ = cv2.connectedComponentsWithStats(fail, connectivity=8)
-    keep = stats[:, cv2.CC_STAT_AREA] >= max(MIN_STRUCTURE_DIES, MIN_STRUCTURE_FRACTION * area)
+    if n == 1:
+        return np.zeros_like(fail)
+    sizes = stats[:, cv2.CC_STAT_AREA]
+    largest = sizes[1:].max()
+    keep = sizes >= noise_threshold((sizes[1:].sum() - largest) / area)
     keep[0] = False
     return keep[lab].astype(np.uint8)
 
