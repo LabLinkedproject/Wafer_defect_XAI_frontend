@@ -1,0 +1,2 @@
+{'patterns': ['Center', 'Donut', 'Edge-Loc', 'Edge-Ring', 'Local', 'Random', 'Scratch', 'Near-full'], 'cell_mm': 5.333333333333333, 'size': 60, 'counts': {'MixedWM38/학습': 27750, 'MixedWM38/검증': 3700, 'MixedWM38/시험': 5550, 'WM-811K/학습': 28731, 'WM-811K/검증': 9732, 'WM-811K/시험': 10323}, 'labels': {'Center': 13240, 'Donut': 9449, 'Edge-Loc': 13057, 'Edge-Ring': 14467, 'Local': 15950, 'Random': 643, 'Scratch': 15055, 'Near-full': 120}}
+학습·시험 중복 0

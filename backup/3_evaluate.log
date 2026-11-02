@@ -1,0 +1,22 @@
+온도 0.8000000000000003 판정선 {'Center': 0.84, 'Donut': 0.9, 'Edge-Loc': 0.52, 'Edge-Ring': 0.8, 'Local': 0.5, 'Random': 0.62, 'Scratch': 0.68, 'Near-full': 0.9}
+WM-811K 로트 분리 시험 (실제 공장 데이터) 44다이 판정 {'exact_match': 0.6603, 'exact_ci': [0.542, 0.8253], 'macro_f1': 0.4083, 'macro_ci': [0.3158, 0.4342], 'normal_correct': 0.8467, 'ece': 0.177, 'ece_before': 0.1431}
+WM-811K 로트 분리 시험 (실제 공장 데이터) 44다이 2×2 구역 {'exact_match': 0.7496, 'exact_ci': [0.6378, 0.8474], 'macro_f1': 0.5759, 'macro_ci': [0.4464, 0.594], 'normal_correct': 0.8675, 'ece': 0.1451, 'ece_before': 0.1178}
+WM-811K 로트 분리 시험 (실제 공장 데이터) 44다이 3×3 구역 {'exact_match': 0.7632, 'exact_ci': [0.6575, 0.8521], 'macro_f1': 0.5827, 'macro_ci': [0.3827, 0.6149], 'normal_correct': 0.8827, 'ece': 0.1232, 'ece_before': 0.1041}
+WM-811K 로트 분리 시험 (실제 공장 데이터) 44다이 6×6 구역 {'exact_match': 0.7838, 'exact_ci': [0.6775, 0.8662], 'macro_f1': 0.5879, 'macro_ci': [0.3589, 0.6499], 'normal_correct': 0.9203, 'ece': 0.0892, 'ece_before': 0.0852}
+MixedWM38 시험 44다이 판정 {'exact_match': 0.451, 'exact_ci': [0.4117, 0.4932], 'macro_f1': 0.8382, 'macro_ci': [0.8225, 0.8505], 'normal_correct': 1.0, 'ece': 0.1255, 'ece_before': 0.1182}
+MixedWM38 시험 44다이 2×2 구역 {'exact_match': 0.6445, 'exact_ci': [0.6096, 0.6789], 'macro_f1': 0.9052, 'macro_ci': [0.8933, 0.9146], 'normal_correct': 1.0, 'ece': 0.0807, 'ece_before': 0.0835}
+MixedWM38 시험 44다이 3×3 구역 {'exact_match': 0.6661, 'exact_ci': [0.6301, 0.6991], 'macro_f1': 0.9156, 'macro_ci': [0.9048, 0.9246], 'normal_correct': 1.0, 'ece': 0.0753, 'ece_before': 0.0781}
+MixedWM38 시험 44다이 6×6 구역 {'exact_match': 0.6175, 'exact_ci': [0.5787, 0.6544], 'macro_f1': 0.8956, 'macro_ci': [0.8836, 0.9044], 'normal_correct': 1.0, 'ece': 0.0525, 'ece_before': 0.0576}
+규칙 분류기 {'exact_match': 0.5302, 'exact_ci': [0.3429, 0.8093], 'macro_f1': 0.194, 'macro_ci': [0.1063, 0.2207], 'normal_correct': 0.8766, 'ece': 0.1882}
+교차 {'train': 'MixedWM38 만 학습 (v1)', 'test': 'WM-811K 로트 분리 시험 (실제 공장 데이터)', 'note': '두 데이터의 원본이 겹치는 Random, Near-full 제외', 'exact_match': 0.3526, 'exact_ci': [0.1733, 0.5128], 'macro_f1': 0.3635, 'macro_ci': [0.1687, 0.4038], 'normal_correct': 0.2313, 'ece': 0.2695}
+  normal         {'학습 모델': [], '규칙': []}
+  center         {'학습 모델': ['Center'], '규칙': ['Center']}
+  donut          {'학습 모델': ['Donut', 'Scratch'], '규칙': ['Donut']}
+  edge_ring      {'학습 모델': ['Edge-Ring', 'Scratch'], '규칙': ['Edge-Ring']}
+  edge_loc       {'학습 모델': ['Edge-Loc'], '규칙': ['Edge-Loc']}
+  local          {'학습 모델': [], '규칙': ['Local']}
+  random         {'학습 모델': ['Local'], '규칙': ['Random']}
+  scratch        {'학습 모델': [], '규칙': ['Scratch']}
+  near_full      {'학습 모델': ['Random', 'Scratch', 'Edge-Ring'], '규칙': ['Near-full']}
+  donut_scratch  {'학습 모델': ['Donut'], '규칙': ['Donut', 'Scratch']}
+  ring_random    {'학습 모델': ['Edge-Ring', 'Scratch'], '규칙': ['Edge-Ring', 'Random']}

@@ -1,0 +1,22 @@
+파라미터 47352 학습 58238 검증 13432 pos_weight [3.200000047683716, 5.199999809265137, 3.4000000953674316, 2.799999952316284, 2.5999999046325684, 20.0, 2.9000000953674316, 20.0]
+{'epoch': 1, 'loss': 0.7207, 'val_die_f1': 0.5912, 'val_q2_f1': 0.6304, 'minutes': 2.8}
+{'epoch': 2, 'loss': 0.4509, 'val_die_f1': 0.5932, 'val_q2_f1': 0.6197, 'minutes': 5.6}
+{'epoch': 3, 'loss': 0.3968, 'val_die_f1': 0.4773, 'val_q2_f1': 0.5401, 'minutes': 8.4}
+{'epoch': 4, 'loss': 0.3703, 'val_die_f1': 0.6342, 'val_q2_f1': 0.7084, 'minutes': 11.2}
+{'epoch': 5, 'loss': 0.3579, 'val_die_f1': 0.6048, 'val_q2_f1': 0.6816, 'minutes': 14.0}
+{'epoch': 6, 'loss': 0.3438, 'val_die_f1': 0.662, 'val_q2_f1': 0.7356, 'minutes': 16.8}
+{'epoch': 7, 'loss': 0.3376, 'val_die_f1': 0.6374, 'val_q2_f1': 0.7291, 'minutes': 19.6}
+{'epoch': 8, 'loss': 0.3294, 'val_die_f1': 0.6382, 'val_q2_f1': 0.7045, 'minutes': 22.4}
+{'epoch': 9, 'loss': 0.3228, 'val_die_f1': 0.6607, 'val_q2_f1': 0.7589, 'minutes': 25.2}
+{'epoch': 10, 'loss': 0.3204, 'val_die_f1': 0.6542, 'val_q2_f1': 0.7354, 'minutes': 28.0}
+{'epoch': 11, 'loss': 0.3153, 'val_die_f1': 0.6643, 'val_q2_f1': 0.7546, 'minutes': 30.8}
+{'epoch': 12, 'loss': 0.3093, 'val_die_f1': 0.6653, 'val_q2_f1': 0.7529, 'minutes': 33.6}
+{'epoch': 13, 'loss': 0.3052, 'val_die_f1': 0.6603, 'val_q2_f1': 0.7466, 'minutes': 36.4}
+{'epoch': 14, 'loss': 0.3022, 'val_die_f1': 0.6674, 'val_q2_f1': 0.7592, 'minutes': 39.2}
+{'epoch': 15, 'loss': 0.2992, 'val_die_f1': 0.6739, 'val_q2_f1': 0.7658, 'minutes': 42.0}
+{'epoch': 16, 'loss': 0.2958, 'val_die_f1': 0.6814, 'val_q2_f1': 0.7764, 'minutes': 44.8}
+{'epoch': 17, 'loss': 0.2954, 'val_die_f1': 0.6744, 'val_q2_f1': 0.7681, 'minutes': 47.6}
+{'epoch': 18, 'loss': 0.2927, 'val_die_f1': 0.6784, 'val_q2_f1': 0.7724, 'minutes': 50.4}
+{'epoch': 19, 'loss': 0.2919, 'val_die_f1': 0.6763, 'val_q2_f1': 0.7707, 'minutes': 53.2}
+{'epoch': 20, 'loss': 0.293, 'val_die_f1': 0.6758, 'val_q2_f1': 0.7702, 'minutes': 56.0}
+최고 검증 점수 0.7289
