@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -25,10 +26,11 @@ import training_status                                 # noqa: E402
 EPOCHS = "20"
 STEPS = [("fetch_wm811k", []), ("prepare_data", []), ("train", ["--epochs", EPOCHS]), ("evaluate", ["--tag", "a"]),
          ("pseudo_label", []), ("train", ["--epochs", EPOCHS, "--pseudo", "--out", "models/wafernet_b.pt"]),
-         ("evaluate", ["--ckpt", "models/wafernet_b.pt", "--tag", "b"]), ("baseline", []), ("export", []), ("compare", [])]
+         ("evaluate", ["--ckpt", "models/wafernet_b.pt", "--tag", "b"]), ("baseline", []), ("tune", []), ("export", []), ("compare", [])]
 STATE = "models/pipeline_state.json"
 LOCK = "models/pipeline.lock"
 DONE = "models/PIPELINE_DONE"
+HEARTBEAT = "models/heartbeat.log"
 MAX_FAILS = 5
 RETRY_SECONDS = 20
 
@@ -39,6 +41,15 @@ def load_state() -> dict:
             return json.load(f)
     except (OSError, ValueError):
         return {"done": 0, "fails": 0}
+
+
+def heartbeat():
+    """다음에 보드가 갑자기 꺼져도 직전 상태를 볼 수 있게 남긴다. /var/log 는 재부팅하면 사라진다."""
+    while True:
+        with open("/proc/meminfo") as f:
+            avail = int(next(line for line in f if line.startswith("MemAvailable")).split()[1]) // 1024
+        durable.append_line(HEARTBEAT, f"{time.strftime('%m-%d %H:%M:%S')} {training_status.temperature_c():.0f}C 여유 {avail}MB 부하 {os.getloadavg()[0]:.1f}")
+        time.sleep(15)
 
 
 def keep_v1():
@@ -55,6 +66,7 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         return                                           # 이미 돌고 있다
+    threading.Thread(target=heartbeat, daemon=True).start()
     st = load_state()
     if st["done"] == 0 and st["fails"] == 0:
         keep_v1()
@@ -62,7 +74,7 @@ def main():
     py = sys.executable
     for k in range(st["done"], len(STEPS)):
         mod, args = STEPS[k]
-        cpus = "4-7" if mod == "train" else "0-3" if mod == "fetch_wm811k" else "0-7"
+        cpus = "0-3" if mod == "fetch_wm811k" else "4-7"   # 8코어 동시 사용 단계에서 보드가 재부팅된 적이 있다
         while True:
             training_status.report("pipeline", k, len(STEPS), f"{training_status.JOB_NAMES[mod]} 진행 중", unit="단계")
             with open(f"models/{k}_{mod}.log", "a") as out:

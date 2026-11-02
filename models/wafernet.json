@@ -9,20 +9,20 @@
     "Scratch",
     "Near-full"
   ],
-  "epoch": 16,
+  "epoch": 17,
   "variant": "b",
   "size": 60,
   "cell_mm": 5.333333333333333,
   "cells_per_die": 6,
-  "temperature": 0.8000000000000003,
+  "temperature": 0.8500000000000003,
   "thresholds": {
-    "Center": 0.86,
-    "Donut": 0.86,
-    "Edge-Loc": 0.54,
-    "Edge-Ring": 0.82,
-    "Local": 0.48,
-    "Random": 0.68,
-    "Scratch": 0.64,
+    "Center": 0.96,
+    "Donut": 0.9,
+    "Edge-Loc": 0.64,
+    "Edge-Ring": 0.98,
+    "Local": 0.58,
+    "Random": 0.34,
+    "Scratch": 0.32,
     "Near-full": 0.9
   }
 }
