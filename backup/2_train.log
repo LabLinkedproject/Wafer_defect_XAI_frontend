@@ -21,3 +21,25 @@
 {'epoch': 19, 'loss': 0.3004, 'val_die_f1': 0.6721, 'val_q2_f1': 0.7648, 'minutes': 53.5}
 {'epoch': 20, 'loss': 0.2994, 'val_die_f1': 0.6769, 'val_q2_f1': 0.7695, 'minutes': 56.3}
 최고 검증 점수 0.7233
+파라미터 47352 학습 56481 검증 13432 pos_weight [3.299999952316284, 5.0, 3.299999952316284, 2.9000000953674316, 2.5, 20.0, 2.799999952316284, 20.0]
+{'epoch': 1, 'loss': 0.7106, 'val_die_f1': 0.4416, 'val_q2_f1': 0.4932, 'minutes': 2.8}
+{'epoch': 2, 'loss': 0.4439, 'val_die_f1': 0.574, 'val_q2_f1': 0.6511, 'minutes': 5.6}
+{'epoch': 3, 'loss': 0.3894, 'val_die_f1': 0.6414, 'val_q2_f1': 0.7132, 'minutes': 8.3}
+{'epoch': 4, 'loss': 0.3649, 'val_die_f1': 0.645, 'val_q2_f1': 0.7015, 'minutes': 11.1}
+{'epoch': 5, 'loss': 0.3499, 'val_die_f1': 0.6463, 'val_q2_f1': 0.7019, 'minutes': 13.9}
+{'epoch': 6, 'loss': 0.338, 'val_die_f1': 0.6655, 'val_q2_f1': 0.7204, 'minutes': 16.7}
+{'epoch': 7, 'loss': 0.3286, 'val_die_f1': 0.6175, 'val_q2_f1': 0.7084, 'minutes': 19.6}
+{'epoch': 8, 'loss': 0.322, 'val_die_f1': 0.6754, 'val_q2_f1': 0.7487, 'minutes': 22.5}
+{'epoch': 9, 'loss': 0.3155, 'val_die_f1': 0.6212, 'val_q2_f1': 0.7058, 'minutes': 25.4}
+{'epoch': 10, 'loss': 0.3101, 'val_die_f1': 0.6703, 'val_q2_f1': 0.7358, 'minutes': 28.2}
+{'epoch': 11, 'loss': 0.3026, 'val_die_f1': 0.6459, 'val_q2_f1': 0.7437, 'minutes': 31.0}
+{'epoch': 12, 'loss': 0.302, 'val_die_f1': 0.6713, 'val_q2_f1': 0.7523, 'minutes': 33.9}
+{'epoch': 13, 'loss': 0.3009, 'val_die_f1': 0.6834, 'val_q2_f1': 0.7619, 'minutes': 36.7}
+{'epoch': 14, 'loss': 0.2963, 'val_die_f1': 0.678, 'val_q2_f1': 0.7609, 'minutes': 39.6}
+{'epoch': 15, 'loss': 0.292, 'val_die_f1': 0.6874, 'val_q2_f1': 0.7588, 'minutes': 42.4}
+{'epoch': 16, 'loss': 0.2906, 'val_die_f1': 0.6831, 'val_q2_f1': 0.7648, 'minutes': 45.2}
+{'epoch': 17, 'loss': 0.2878, 'val_die_f1': 0.6899, 'val_q2_f1': 0.7627, 'minutes': 48.0}
+{'epoch': 18, 'loss': 0.2855, 'val_die_f1': 0.6891, 'val_q2_f1': 0.7619, 'minutes': 50.9}
+{'epoch': 19, 'loss': 0.2858, 'val_die_f1': 0.6895, 'val_q2_f1': 0.7617, 'minutes': 53.7}
+{'epoch': 20, 'loss': 0.2867, 'val_die_f1': 0.6882, 'val_q2_f1': 0.7609, 'minutes': 56.6}
+최고 검증 점수 0.7263
