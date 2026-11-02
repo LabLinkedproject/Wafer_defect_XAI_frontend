@@ -67,6 +67,18 @@ def from_dies(dies: list[dict], values: dict[int, float]) -> np.ndarray:
     return np.stack([fill, die_mask(dies), radius_map()])
 
 
+def from_quadrats(dies: list[dict], values: dict[tuple, float], per_die: int) -> np.ndarray:
+    """구역 판정 → 입력 3채널. values: {(다이 id, 구역 행, 구역 열): 0~1}"""
+    k = CELLS_PER_DIE // per_die
+    fill = np.zeros((SIZE, SIZE), np.float32)
+    by_id = {d["id"]: d for d in dies}
+    for (i, qr, qc), val in values.items():
+        r, c = die_slot(by_id[i])
+        y, x = r * CELLS_PER_DIE + qr * k, c * CELLS_PER_DIE + qc * k
+        fill[y:y + k, x:x + k] = val
+    return np.stack([fill, die_mask(dies), radius_map()])
+
+
 def from_points(points_mm, spec=WAFER_MODEL) -> np.ndarray:
     """결함 좌표(웨이퍼 중심 기준 mm, 위쪽 +y) → 입력 3채널. 합성 맵에서 좌표를 얻을 때 쓴다."""
     fill = np.zeros((SIZE, SIZE), np.float32)
