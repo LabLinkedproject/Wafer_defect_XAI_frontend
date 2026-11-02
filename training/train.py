@@ -19,6 +19,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from training import durable                                                    # noqa: E402
 from training.model import Geometry, WaferNet, augment, quadrat_map   # noqa: E402
 import training_status                                                          # noqa: E402
 
@@ -28,6 +29,7 @@ CKPT = os.path.join(OUT_DIR, "wafernet.pt")
 LOG = os.path.join(OUT_DIR, "training_log.jsonl")
 QUADRATS = (1, 2, 3, 6)       # 다이 한 변을 나누는 구역 수
 QUADRAT_SHARE = (0.35, 0.3, 0.2, 0.15)
+SAVE_SECONDS = 300            # 학습 도중 저장 간격
 TRAIN, VAL, TEST = 0, 1, 2
 MIXED, WM811K = 0, 1
 
@@ -119,14 +121,38 @@ def main():
     print("파라미터", sum(p.numel() for p in model.parameters()), "학습", len(y_tr), "검증", len(va),
           "pos_weight", weight.numpy().round(1).tolist(), flush=True)
     os.makedirs(OUT_DIR, exist_ok=True)
-    if not a.time_only:
-        open(LOG, "w").close()
-    best, t0 = -1.0, time.time()
-    for ep in range(a.epochs):
+    durable.catch_stop_signal()
+    resume_path = os.path.join(OUT_DIR, f"resume_{os.path.basename(a.out)}")
+    state = durable.load_checkpoint(resume_path)
+    if state and state.get("finished"):
+        print("이미 끝난 학습입니다", flush=True)
+        return
+    start_ep, start_b, total, best, elapsed = 0, 0, 0.0, -1.0, 0.0
+    if state:
+        model.load_state_dict(state["model"])
+        opt.load_state_dict(state["opt"])
+        sched.load_state_dict(state["sched"])
+        torch.set_rng_state(state["rng"])
+        start_ep, start_b, total, best, elapsed = state["epoch"], state["batch"], state["total"], state["best"], state["elapsed"]
+        with open(LOG) as f:
+            kept = [line for line in f if json.loads(line)["epoch"] <= start_ep]
+        durable.write_bytes(LOG, "".join(kept).encode())
+        durable.event(f"학습 이어가기: 에폭 {start_ep + 1}, 배치 {start_b}/{batches} ({os.path.basename(a.out)})")
+    else:
+        durable.write_bytes(LOG, b"")
+        durable.event(f"학습 시작: {len(y_tr):,}장, {a.epochs}에폭 ({os.path.basename(a.out)})")
+
+    def save(ep, b, total, finished=False):
+        durable.save_checkpoint({"model": model.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
+                                 "rng": torch.get_rng_state(), "epoch": ep, "batch": b, "total": total, "best": best,
+                                 "elapsed": elapsed + time.time() - t0, "finished": finished}, resume_path)
+
+    t0, last_save = time.time(), time.time()
+    for ep in range(start_ep, a.epochs):
         model.train()
-        perm = torch.randperm(len(y_tr))
-        total = 0.0
-        for b in range(batches):
+        # 이어갈 때 같은 순서가 나오도록 에폭 번호로 정한다
+        perm = torch.randperm(len(y_tr), generator=torch.Generator().manual_seed(a.seed * 1000 + ep))
+        for b in range(start_b, batches):
             ids = perm[b * a.batch:(b + 1) * a.batch]
             y = y_tr[ids]
             x = train_input(raw_tr[ids], core_tr[ids], y, g, random_index)
@@ -138,20 +164,33 @@ def main():
             total += loss.item()
             if b % 25 == 0:
                 training_status.report("train", ep, a.epochs, f"에폭 {ep + 1} · 배치 {b}/{batches} · 손실 {total / (b + 1):.3f}", unit="에폭")
+                durable.wait_if_hot("train", ep, a.epochs, "에폭")
             if a.time_only and b == 19:
                 print(f"배치당 {(time.time() - t0) / 20:.3f} s → 에폭당 {(time.time() - t0) / 20 * batches / 60:.1f} 분")
                 return
+            if durable.stop_requested():
+                save(ep, b + 1, total)
+                durable.event(f"학습 멈춤: 에폭 {ep + 1}, 배치 {b + 1}/{batches} 저장")
+                sys.exit(durable.EXIT_PAUSED)
+            if time.time() - last_save > SAVE_SECONDS:
+                save(ep, b + 1, total)
+                last_save = time.time()
         prob_die = 1 / (1 + np.exp(-logits_of(model, lambda r, c: quadrat_map(c, g, 1), raw_va, core_va)))
         prob_q2 = 1 / (1 + np.exp(-logits_of(model, lambda r, c: quadrat_map(c, g, 2), raw_va, core_va)))
+        minutes = round((elapsed + time.time() - t0) / 60, 1)
         row = {"epoch": ep + 1, "loss": round(total / batches, 4), "val_die_f1": round(macro_f1(prob_die, y_va), 4),
-               "val_q2_f1": round(macro_f1(prob_q2, y_va), 4), "minutes": round((time.time() - t0) / 60, 1)}
-        with open(LOG, "a") as f:
-            f.write(json.dumps(row) + "\n")
+               "val_q2_f1": round(macro_f1(prob_q2, y_va), 4), "minutes": minutes}
+        durable.append_line(LOG, json.dumps(row))
         print(row, flush=True)
         score = (row["val_die_f1"] + row["val_q2_f1"]) / 2
         if score > best:
             best = score
-            torch.save({"state": model.state_dict(), "patterns": patterns, "epoch": ep + 1, "seed": a.seed, "val_score": score}, a.out)
+            durable.save_checkpoint({"state": model.state_dict(), "patterns": patterns, "epoch": ep + 1, "seed": a.seed, "val_score": score}, a.out)
+        start_b, total = 0, 0.0
+        save(ep + 1, 0, 0.0)
+        last_save = time.time()
+    save(a.epochs, 0, 0.0, finished=True)
+    durable.event(f"학습 완료: 최고 검증 점수 {best:.4f} ({os.path.basename(a.out)})")
     print("최고 검증 점수", best, flush=True)
 
 

@@ -23,7 +23,6 @@ training/prepare_data.py
 from __future__ import annotations
 import collections
 import hashlib
-import json
 import os
 import sys
 
@@ -32,6 +31,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from adc.knowledge import PATTERNS                     # noqa: E402
+from training import durable                           # noqa: E402
 import training_status                                 # noqa: E402
 import wafer_raster as R                               # noqa: E402
 
@@ -128,6 +128,7 @@ def write_mixed(X, use, raw, core):
         raw[n], core[n] = to_grid(fail * 255, box), to_grid(structure(fail, (m > 0).sum()) * 255, box)
         if n % 1000 == 0:
             training_status.report("prepare_data", n, len(use), "MixedWM38 을 270 mm 격자로 변환", unit="장")
+            durable.wait_if_hot("prepare_data", n, len(use), "장")
 
 
 def load_wm811k():
@@ -162,6 +163,7 @@ def write_wm811k(t, use, raw, core):
         raw[n], core[n] = to_grid(fail * 255, box), to_grid(structure(fail, area) * 255, box)
         if n % 1000 == 0:
             training_status.report("prepare_data", n, len(use), "WM-811K 를 270 mm 격자로 변환", unit="장")
+            durable.wait_if_hot("prepare_data", n, len(use), "장")
 
 
 def main():
@@ -170,13 +172,18 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     n0, n = len(u0), len(u0) + len(u1)
     shape = (n, R.SIZE, R.SIZE)
-    raw = np.lib.format.open_memmap(f"{OUT_DIR}/raw.npy", "w+", np.uint8, shape)
-    core = np.lib.format.open_memmap(f"{OUT_DIR}/core.npy", "w+", np.uint8, shape)
+    # 끊기면 임시 파일만 남고, 다음 실행이 처음부터 다시 만든다
+    raw = np.lib.format.open_memmap(f"{OUT_DIR}/raw.tmp", "w+", np.uint8, shape)
+    core = np.lib.format.open_memmap(f"{OUT_DIR}/core.tmp", "w+", np.uint8, shape)
     write_mixed(X, u0, raw[:n0], core[:n0])
     del X
     write_wm811k(t, u1, raw[n0:], core[n0:])
     raw.flush()
     core.flush()
+    del raw, core
+    os.sync()
+    os.replace(f"{OUT_DIR}/raw.tmp", f"{OUT_DIR}/raw.npy")
+    os.replace(f"{OUT_DIR}/core.tmp", f"{OUT_DIR}/core.npy")
     labels, split = np.concatenate([y0, y1]), np.concatenate([s0, s1])
     source = np.concatenate([np.full(n0, MIXED, np.uint8), np.full(len(u1), WM811K, np.uint8)])
     wafer = np.concatenate([np.zeros(n0, np.int32) - 1, t["ids"][u1]])
@@ -185,9 +192,8 @@ def main():
             "counts": {f"{'MixedWM38' if s == MIXED else 'WM-811K'}/{['학습', '검증', '시험'][k]}":
                        int(((source == s) & (split == k)).sum()) for s in (MIXED, WM811K) for k in range(3)},
             "labels": dict(zip(PATTERNS, labels[split == TRAIN].sum(0).tolist()))}
-    with open(f"{OUT_DIR}/info.json", "w") as f:
-        json.dump(info, f, ensure_ascii=False, indent=2)
-    print(json.dumps(info, ensure_ascii=False, indent=2))
+    durable.write_json(f"{OUT_DIR}/info.json", info)
+    print(info)
     w = wafer[source == WM811K]
     sp = split[source == WM811K]
     print("학습·시험 중복", len(set(w[sp == TRAIN].tolist()) & set(w[sp == TEST].tolist())))

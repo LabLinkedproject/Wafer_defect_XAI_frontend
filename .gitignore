@@ -46,6 +46,15 @@ adc_feedback.jsonl
 venv-train/
 datasets/
 models/*.pt
+models/*.pt.prev
+models/*.new
+models/STOP
+models/PIPELINE_DONE
+models/pipeline.lock
+models/pipeline_state.json
+models/events.log
+models/data_status.json
+models/v1/
 models/*.log
 models/progress_*.json
 models/job_progress.json

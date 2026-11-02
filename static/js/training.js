@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const TITLES = {
     running: "지금 학습 중입니다", stalled: "멈춘 것 같습니다", stopped: "학습이 중단되었습니다",
-    idle: "지금은 학습하지 않습니다", offline: "상태를 읽을 수 없습니다",
+    idle: "지금은 학습하지 않습니다", paused: "멈춤 상태입니다", offline: "상태를 읽을 수 없습니다",
   };
 
   function duration(sec) {
@@ -113,7 +113,10 @@
     $("jobs").innerHTML = s.jobs.map(jobCard).join("");
     renderCharts(s);
     renderMetrics(s.metrics);
-    $("clock").textContent = `${new Date().toLocaleTimeString("ko-KR")} 확인`;
+    $("eventsPanel").hidden = !s.events.length;
+    $("events").textContent = s.events.join("\n");
+    const temp = s.temperature_c != null ? `보드 ${Math.round(s.temperature_c)}°C · ` : "";
+    $("clock").textContent = `${temp}${new Date().toLocaleTimeString("ko-KR")} 확인`;
   }
 
   async function tick() {

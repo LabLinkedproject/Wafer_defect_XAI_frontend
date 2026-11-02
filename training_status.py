@@ -36,6 +36,32 @@ def report(job: str, done: int, total: int, detail: str = "", **extra):
     os.replace(tmp, path)
 
 
+def temperature_c() -> float | None:
+    """가장 뜨거운 온도 구역의 값"""
+    temps = []
+    base = "/sys/class/thermal"
+    for name in os.listdir(base):
+        if name.startswith("thermal_zone"):
+            try:
+                with open(f"{base}/{name}/temp") as f:
+                    temps.append(int(f.read()) / 1000)
+            except (OSError, ValueError):
+                pass
+    return max(temps) if temps else None
+
+
+def _events(n: int = 8) -> list[str]:
+    try:
+        with open(os.path.join(PROGRESS_DIR, "events.log"), encoding="utf8") as f:
+            return [line.rstrip() for line in f.readlines()[-n:]]
+    except OSError:
+        return []
+
+
+def _pipeline() -> dict:
+    return _read_json(os.path.join(PROGRESS_DIR, "pipeline_state.json")) or {}
+
+
 def _progress_files() -> list[str]:
     return [os.path.join(PROGRESS_DIR, n) for n in os.listdir(PROGRESS_DIR)
             if n.startswith("progress_") and n.endswith(".json")]
@@ -135,7 +161,10 @@ def status() -> dict:
     now = time.time()
     metrics_time = os.path.getmtime(METRICS) if os.path.exists(METRICS) else 0
     log_time = os.path.getmtime(LOG) if os.path.exists(LOG) else 0
-    out = {"now": now, "history": history, "metrics": _read_json(METRICS), "jobs": []}
+    out = {"now": now, "history": history, "metrics": _read_json(METRICS), "jobs": [], "temperature_c": temperature_c(),
+           "events": _events(), "pipeline": _pipeline(), "data": _read_json(os.path.join(PROGRESS_DIR, "data_status.json"))}
+    stop_file = os.path.join(PROGRESS_DIR, "STOP")
+    done_file = os.path.join(PROGRESS_DIR, "PIPELINE_DONE")
     if procs:
         progress = {}
         for path in _progress_files():
@@ -149,8 +178,16 @@ def status() -> dict:
         out["training"] = procs[0]["job"] == "train"
         if out["training"]:
             out["epochs_total"] = out["jobs"][0].get("total")
-    elif history and metrics_time < log_time:
-        out.update(state="stopped", message=f"에폭 {history[-1]['epoch']}에서 학습 프로세스가 끝났고 최종 평가 기록이 없습니다.")
+    elif os.path.exists(done_file):
+        out.update(state="idle", message="전체 학습 절차가 완료되었습니다.")
+    elif os.path.exists(stop_file):
+        with open(stop_file) as f:
+            failed = "failed" in f.read()
+        out.update(state="stopped" if failed else "paused",
+                   message="같은 단계가 반복해서 실패해 멈췄습니다. 기록을 확인해야 합니다." if failed
+                   else "멈춤 상태입니다. 진행 내용은 저장되어 있고 ./training_ctl.sh start 로 이어갑니다.")
+    elif _pipeline():
+        out.update(state="stopped", message="절차가 끝나지 않았는데 실행 중이 아닙니다. ./training_ctl.sh start 로 이어갑니다.")
     elif metrics_time:
         out.update(state="idle", message="실행 중인 작업이 없습니다. 마지막 학습은 완료되었습니다.")
     else:
@@ -160,15 +197,16 @@ def status() -> dict:
 
 def text() -> str:
     s = status()
+    temp = f"온도 {s['temperature_c']:.0f}°C" if s["temperature_c"] else ""
     if not s["jobs"]:
-        return ("✖ 중단됨: " if s["state"] == "stopped" else "○ 실행 안 함: ") + s["message"]
+        return {"stopped": "✖ 중단됨: ", "paused": "⏸ 멈춤: "}.get(s["state"], "○ 실행 안 함: ") + s["message"] + f" ({temp})"
     lines = []
     for j in s["jobs"]:
         count = f"{j.get('done', '?')}/{j.get('total', '?')} {j.get('unit', '')}".strip()
         eta = f", 남은 시간 약 {j['eta_seconds'] // 60}분" if "eta_seconds" in j else ""
         flag = "  ⚠ 멈춘 것 같음" if j["stalled"] else ""
         lines.append(f"● 실행 중: {j['job_name']} {count}{eta}, CPU {j['cpu_percent']}% (PID {j['pid']}){flag}")
-    return "\n".join(lines)
+    return "\n".join(lines + [temp])
 
 
 if __name__ == "__main__":

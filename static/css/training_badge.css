@@ -5,3 +5,4 @@
 .train-badge[data-state=running] { background: #1a8a4a; }
 .train-badge[data-state=stalled] { background: #b36b00; }
 .train-badge[data-state=stopped] { background: #c0392b; }
+.train-badge[data-state=paused] { background: #2a78d6; }

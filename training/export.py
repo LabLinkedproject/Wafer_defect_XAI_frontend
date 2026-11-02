@@ -17,6 +17,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from training import durable                           # noqa: E402
 from training.model import WaferNet                    # noqa: E402
 import wafer_raster as R                               # noqa: E402
 
@@ -44,9 +45,8 @@ def main():
     torch.onnx.export(net, (x,), ONNX, opset_version=13, input_names=["input"], output_names=["logit"], dynamo=False)
     with open(f"models/calibration_{tag}.json") as f:
         cal = json.load(f)
-    with open(META, "w") as f:
-        json.dump({"patterns": ck["patterns"], "epoch": ck["epoch"], "variant": tag, "size": R.SIZE, "cell_mm": R.CELL_MM,
-                   "cells_per_die": R.CELLS_PER_DIE, **cal}, f, ensure_ascii=False, indent=2)
+    durable.write_json(META, {"patterns": ck["patterns"], "epoch": ck["epoch"], "variant": tag, "size": R.SIZE, "cell_mm": R.CELL_MM,
+                              "cells_per_die": R.CELLS_PER_DIE, **cal})
     dnn = cv2.dnn.readNetFromONNX(ONNX)
     worst = 0.0
     for _ in range(20):

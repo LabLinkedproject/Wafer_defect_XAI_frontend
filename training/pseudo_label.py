@@ -20,6 +20,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from training import durable                           # noqa: E402
 from training.evaluate import load_net, sigmoid        # noqa: E402
 from training.fetch_wm811k import PARTS, SHARDS        # noqa: E402
 from training.model import Geometry, quadrat_map       # noqa: E402
@@ -72,7 +73,13 @@ def main():
     kept_raw, kept_core, kept_y = [], [], []
     seen = 0
     order = np.random.default_rng(7).permutation(SHARDS)
+    durable.catch_stop_signal()
     for k, shard in enumerate(order):
+        if not os.path.exists(f"{PARTS}/{shard:04d}.npz"):
+            continue                                     # 네트워크 없이 진행한 경우 일부 샤드가 없다
+        if durable.stop_requested():
+            sys.exit(durable.EXIT_PAUSED)
+        durable.wait_if_hot("pseudo_label", k, SHARDS, "샤드")
         d = np.load(f"{PARTS}/{shard:04d}.npz")
         d = {n: d[n] for n in ("u_ids", "u_shapes", "u_ellipse", "u_lengths", "u_xy")}
         picks = np.where(usable(d["u_ids"], d["u_ellipse"]))[0]
@@ -108,8 +115,8 @@ def main():
     np.save(f"{DATA_DIR}/pseudo_labels.npy", np.stack(kept_y))
     res = {"judged": seen, "kept": int(sum(got)), "per_class": dict(zip(patterns + ["Normal"], got.tolist()))}
     print(res, flush=True)
-    with open("models/pseudo_label.json", "w") as f:
-        json.dump(res, f, ensure_ascii=False, indent=2)
+    durable.write_json("models/pseudo_label.json", res)
+    durable.event(f"추가 라벨 {res['kept']:,}장 채택 ({res['judged']:,}장 판정)")
 
 
 if __name__ == "__main__":

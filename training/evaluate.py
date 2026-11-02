@@ -14,7 +14,6 @@ training/evaluate.py
 """
 from __future__ import annotations
 import argparse
-import json
 import os
 import sys
 
@@ -23,6 +22,7 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from adc import scenarios, scoring                     # noqa: E402
+from training import durable                           # noqa: E402
 from training.model import Geometry, WaferNet, full_map, quadrat_map   # noqa: E402
 from training.train import (CKPT, MIXED, TEST, VAL, WM811K, load_images, load_meta, logits_of, to_float)  # noqa: E402
 import training_status                                 # noqa: E402
@@ -159,8 +159,7 @@ def main():
     temperature = fit_temperature(joined, y_val)
     thresholds = fit_thresholds(sigmoid(joined / temperature), y_val)
     print("온도", temperature, "판정선", dict(zip(patterns, thresholds.tolist())), flush=True)
-    with open(META, "w") as f:
-        json.dump({"temperature": temperature, "thresholds": dict(zip(patterns, thresholds.tolist()))}, f, ensure_ascii=False, indent=2)
+    durable.write_json(META, {"temperature": temperature, "thresholds": dict(zip(patterns, thresholds.tolist()))})
 
     result = {"epoch": ck["epoch"], "val_score": ck.get("val_score"), "temperature": temperature, "tests": {}}
     names = {WM811K: "WM-811K 로트 분리 시험 (실제 공장 데이터)", MIXED: "MixedWM38 시험"}
@@ -211,8 +210,7 @@ def main():
         rows[name] = {"학습 모델": got, "규칙": scoring.labels_from(scoring.predict(DIES, defects))}
         print(f"  {name:14s} {rows[name]}", flush=True)
     result["scenarios"] = rows
-    with open(OUT, "w") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2, default=float)
+    durable.write_json(OUT, result)
 
 
 if __name__ == "__main__":

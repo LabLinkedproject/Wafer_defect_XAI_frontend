@@ -19,6 +19,7 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 14px
 .lamp[data-state=running] { background: var(--good); }
 .lamp[data-state=stalled] { background: var(--warn); }
 .lamp[data-state=stopped], .lamp[data-state=offline] { background: var(--bad); }
+.lamp[data-state=paused] { background: var(--series-1); }
 .dot { width: 22px; height: 22px; border-radius: 50%; background: #fff; flex: none; opacity: .75; }
 .lamp[data-state=running] .dot { animation: pulse 1.4s ease-in-out infinite; opacity: 1; }
 @keyframes pulse { 50% { transform: scale(.55); opacity: .5; } }
@@ -51,3 +52,4 @@ th:first-child, td:first-child { text-align: left; }
 th { color: var(--muted); font-weight: 600; }
 .panel h3 { margin: 14px 0 6px; font-size: .92rem; }
 .ci { color: var(--muted); font-size: .76rem; font-weight: 400; }
+.events { margin: 8px 0 0; font-size: .78rem; white-space: pre-wrap; color: var(--muted); }
