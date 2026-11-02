@@ -58,3 +58,4 @@ models/v1/
 models/*.log
 models/progress_*.json
 models/job_progress.json
+models/heartbeat.log
