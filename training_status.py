@@ -19,7 +19,7 @@ LOG = os.path.join(BASE, "models", "training_log.jsonl")
 METRICS = os.path.join(BASE, "models", "wafernet_metrics.json")
 JOB_NAMES = {"train": "모델 학습", "fetch_wm811k": "데이터 내려받기", "prepare_data": "데이터 가공",
              "baseline": "기준 모델 비교", "evaluate": "성능 평가", "export": "모델 내보내기",
-             "kfold": "교차 검증", "pipeline": "전체 학습 절차"}
+             "pseudo_label": "추가 라벨 수집", "pipeline": "전체 학습 절차"}
 STALL_SECONDS = 180           # 프로세스는 있는데 이 시간 동안 진행 기록이 없으면 멈춤 의심
 
 

@@ -1,6 +1,7 @@
 """
 training/prepare_data.py
 공개 웨이퍼 맵을 실물 웨이퍼(지름 270 mm, 다이 32 mm) 기준 격자로 가공한다.
+공개 맵은 전부 우리 격자(지름 8다이)보다 촘촘하므로 정보를 부풀리지 않고 우리 스케일로 내릴 수 있다.
 
 실행: ./venv-train/bin/python -m training.prepare_data
 
@@ -42,7 +43,7 @@ WM811K_LABELS = ("Center", "Donut", "Edge-Loc", "Edge-Ring", "Local", "Random", 
 DUPLICATED_IN_WM811K = ("Random", "Near-full")
 MIN_STRUCTURE_FRACTION = 16 / (np.pi * 26 ** 2)   # 지름 52다이 맵의 19 % 잡음을 95 % 거르는 16다이의 면적비
 MIN_STRUCTURE_DIES = 3
-MIN_DIAMETER_DIES = 20        # 이보다 성긴 맵은 다이 한 칸이 13 mm 를 넘어 패턴 형상을 담지 못한다
+MIN_DIAMETER_DIES = 16        # 우리 다이 격자(지름 8칸)의 2배. 이보다 성기면 2×2 구역을 담지 못한다
 SUPER = 4                     # 재표본화 초과 표본
 SPLIT = (0.75, 0.10, 0.15)    # 학습 / 검증 / 시험
 BLOCK = 2000                  # WM-811K 분할 단위 (파일 순서 기준 웨이퍼 수)
@@ -88,20 +89,21 @@ def split_mixed(hashes, combos) -> np.ndarray:
     return np.array([assign[h] for h in hashes], np.uint8)
 
 
+def block_side(block: int) -> int:
+    """구간의 분할을 번호만으로 정한다. 라벨 없는 맵도 같은 구간이면 같은 쪽이 된다."""
+    u = np.random.default_rng(SEED + 1000 * (int(block) + 1)).random()
+    return TRAIN if u < SPLIT[0] else VAL if u < SPLIT[0] + SPLIT[1] else TEST
+
+
 def split_wm811k(ids: np.ndarray) -> np.ndarray:
-    """연속 구간 단위 분할. 경계 근처 웨이퍼는 255(미사용)로 표시한다."""
-    rng = np.random.default_rng(SEED)
+    """연속 구간 단위 분할. 다른 쪽 구간과 맞닿은 웨이퍼는 255(미사용)로 표시한다."""
     blocks = ids // BLOCK
-    uniq = np.unique(blocks)
-    u = rng.random(len(uniq))
-    which = np.where(u < SPLIT[0], TRAIN, np.where(u < SPLIT[0] + SPLIT[1], VAL, TEST))
-    table = dict(zip(uniq.tolist(), which.tolist()))
+    table = {int(b): block_side(b) for b in range(int(blocks.min()) - 1, int(blocks.max()) + 2)}
     split = np.array([table[b] for b in blocks.tolist()], np.uint8)
     pos = ids % BLOCK
-    near = (pos < PURGE) | (pos >= BLOCK - PURGE)
     for side, off in ((pos < PURGE, -1), (pos >= BLOCK - PURGE, 1)):
-        other = np.array([table.get(b + off, -1) for b in blocks.tolist()])
-        split[side & (other != split) & (other >= 0)] = 255
+        other = np.array([table[b + off] for b in blocks.tolist()])
+        split[side & (other != split)] = 255
     return split
 
 

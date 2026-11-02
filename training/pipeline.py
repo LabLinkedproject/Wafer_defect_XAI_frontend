@@ -1,6 +1,7 @@
 """
 training/pipeline.py
-내려받기가 끝나기를 기다린 뒤 가공 → 학습 → 평가 → 기준 비교 → 내보내기를 차례로 실행한다.
+내려받기가 끝나기를 기다린 뒤 가공 → 라벨 데이터 학습 → 평가 → 추가 라벨 수집 → 재학습 → 평가
+→ 기준 비교 → 내보내기를 차례로 실행한다.
 한 단계가 실패하면 멈추고 그 사실을 상태 화면에 남긴다.
 
 실행: ./venv-train/bin/python -m training.pipeline
@@ -15,7 +16,10 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import training_status                                 # noqa: E402
 
-STEPS = [("prepare_data", []), ("train", ["--epochs", "30"]), ("evaluate", []), ("baseline", []), ("export", [])]
+EPOCHS = "20"
+STEPS = [("prepare_data", []), ("train", ["--epochs", EPOCHS]), ("evaluate", ["--tag", "a"]), ("pseudo_label", []),
+         ("train", ["--epochs", EPOCHS, "--pseudo", "--out", "models/wafernet_b.pt"]),
+         ("evaluate", ["--ckpt", "models/wafernet_b.pt", "--tag", "b"]), ("baseline", []), ("export", [])]
 
 
 def others_running() -> bool:
@@ -42,9 +46,9 @@ def main():
     for k, (mod, args) in enumerate(STEPS):
         training_status.report("pipeline", k, len(STEPS), f"{training_status.JOB_NAMES[mod]} 진행 중", unit="단계")
         cpus = "4-7" if mod == "train" else "0-7"
-        code = subprocess.call(["taskset", "-c", cpus, py, "-m", f"training.{mod}", *args], stdout=open(f"models/{mod}.log", "w"), stderr=subprocess.STDOUT)
+        code = subprocess.call(["taskset", "-c", cpus, py, "-m", f"training.{mod}", *args], stdout=open(f"models/{k}_{mod}.log", "w"), stderr=subprocess.STDOUT)
         if code:
-            training_status.report("pipeline", k, len(STEPS), f"{training_status.JOB_NAMES[mod]} 실패: models/{mod}.log 확인", unit="단계", failed=True)
+            training_status.report("pipeline", k, len(STEPS), f"{training_status.JOB_NAMES[mod]} 실패: models/{k}_{mod}.log 확인", unit="단계", failed=True)
             sys.exit(code)
     training_status.report("pipeline", len(STEPS), len(STEPS), "전체 완료", unit="단계")
 

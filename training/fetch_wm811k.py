@@ -1,6 +1,6 @@
 """
 training/fetch_wm811k.py
-WM-811K 라벨 데이터를 내려받아 불량 좌표만 남긴다. 파일이 아니라 메모리에서 바로 풀어 쓴다.
+WM-811K 전체를 내려받아 맵마다 불량 좌표만 남긴다. 라벨 없는 63만 장도 추가 라벨 후보로 보관한다.
 
 출처는 Hugging Face 의 khaubeil/wm811k-demo-data 다. 원본 LSWMD.pkl 을 제3자가 샤드로 변환한 것이어서,
 라벨 수를 보고서의 원본 통계와 대조해 내용이 맞는지 확인한 뒤 저장한다.
@@ -32,6 +32,16 @@ NAMES = {"Center": 0, "Donut": 1, "Edge-Loc": 2, "Edge Ring": 3, "Edge-Ring": 3,
 EXPECTED = {"labeled": 172950, "pattern": 25519, "per_class": [4294, 555, 5189, 9680, 3593, 866, 1193, 149]}
 
 
+def table(rows: list[dict], prefix: str = "") -> dict:
+    xy = [np.array(r["mask"]["fail_xy"], np.uint16).reshape(-1, 2) for r in rows]
+    out = {"ids": np.array([r["sample_id"] for r in rows], np.int32),
+           "shapes": np.array([(r["shape"]["h"], r["shape"]["w"]) for r in rows], np.uint16).reshape(-1, 2),
+           "ellipse": np.array([[r["mask"][c] for c in "cx cy a b".split()] for r in rows], np.float32).reshape(-1, 4),
+           "lengths": np.array([len(a) for a in xy], np.int32),
+           "xy": np.concatenate(xy) if xy else np.zeros((0, 2), np.uint16)}
+    return {prefix + k: v for k, v in out.items()}
+
+
 def fetch(k: int) -> dict:
     """샤드 하나를 받아 필요한 값만 디스크에 남긴다. 메모리에 쌓지 않아 보드가 버티고, 끊겨도 이어 받는다."""
     part = f"{PARTS}/{k:04d}.npz"
@@ -45,24 +55,18 @@ def fetch(k: int) -> dict:
                 if attempt == 5:
                     raise
                 time.sleep(2 ** attempt)
-        rows, counts = [], np.zeros(9, np.int64)
+        rows, unlabeled, counts = [], [], np.zeros(9, np.int64)
         for s in data.values():
             name = s["ground_truth_name"]
             if name is None:
+                unlabeled.append(s)
                 continue
             counts[NAMES[name]] += 1
-            if NAMES[name] == 8 and s["sample_id"] % NORMAL_STRIDE:
-                continue
-            rows.append(s)
+            if NAMES[name] != 8 or s["sample_id"] % NORMAL_STRIDE == 0:
+                rows.append(s)
         del data
-        ids = np.array([r["sample_id"] for r in rows], np.int32)
-        xy = [np.array(r["mask"]["fail_xy"], np.uint16).reshape(-1, 2) for r in rows]
         tmp = part + ".tmp.npz"
-        np.savez(tmp, ids=ids, counts=counts, labels=np.array([NAMES[r["ground_truth_name"]] for r in rows], np.uint8),
-                 shapes=np.array([(r["shape"]["h"], r["shape"]["w"]) for r in rows], np.uint16).reshape(-1, 2),
-                 ellipse=np.array([[r["mask"][c] for c in "cx cy a b".split()] for r in rows], np.float32).reshape(-1, 4),
-                 lengths=np.array([len(a) for a in xy], np.int32),
-                 xy=np.concatenate(xy) if xy else np.zeros((0, 2), np.uint16))
+        np.savez(tmp, counts=counts, labels=np.array([NAMES[r["ground_truth_name"]] for r in rows], np.uint8), **table(rows), **table(unlabeled, "u_"))
         os.replace(tmp, part)
     return np.load(part)["counts"]
 

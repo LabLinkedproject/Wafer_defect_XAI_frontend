@@ -61,7 +61,7 @@
     lineChart($("chartLoss"), [{ name: "손실", color: "var(--series-1)", values: h.map((r) => ({ x: r.epoch, y: r.loss })) }],
       { label: "에폭별 학습 손실", xMax });
     const keys = Object.keys(h[0]).filter((k) => k.startsWith("val_"));
-    const NAMES = { val_full_f1: "전면 맵", val_die_f1: "44다이 2×2 구역", val_f1: "검증" };
+    const NAMES = { val_full_f1: "전면 맵", val_die_f1: "44다이 판정", val_q2_f1: "2×2 구역" };
     const colors = ["var(--series-1)", "var(--series-2)"];
     lineChart($("chartF1"), keys.map((k, i) => ({ name: NAMES[k] || k, color: colors[i % 2], values: h.map((r) => ({ x: r.epoch, y: r[k] })) })),
       { label: "에폭별 검증 Macro-F1", xMax, min: 0, max: 1 });

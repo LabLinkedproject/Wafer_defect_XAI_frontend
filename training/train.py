@@ -4,8 +4,8 @@ training/train.py
 
 실행: taskset -c 4-7 ./venv-train/bin/python -m training.train
 
-입력은 전면 맵과, 검사 다이 44개를 1×1 ~ 6×6 구역으로 나눈 판정을 섞는다.
-잡음은 표본마다 라벨과 무관하게 입힌다. 시험 지표는 training.evaluate 가 계산한다.
+입력은 실물 기준으로만 만든다. 검사 다이 44개를 1×1 ~ 6×6 구역으로 나눈 판정이며, 가장자리 부분 다이는 보이지 않는다.
+산발 결함은 표본마다 라벨과 무관하게 입힌다. 시험 지표는 training.evaluate 가 계산한다.
 """
 from __future__ import annotations
 import argparse
@@ -19,15 +19,15 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from training.model import Geometry, WaferNet, augment, full_map, quadrat_map   # noqa: E402
+from training.model import Geometry, WaferNet, augment, quadrat_map   # noqa: E402
 import training_status                                                          # noqa: E402
 
 DATA_DIR = "datasets/wafer270"
 OUT_DIR = "models"
 CKPT = os.path.join(OUT_DIR, "wafernet.pt")
 LOG = os.path.join(OUT_DIR, "training_log.jsonl")
-MAX_NOISE = 0.22              # 전면 맵 잡음 밀도 상한 (MixedWM38 결함 맵 19 %)
 QUADRATS = (1, 2, 3, 6)       # 다이 한 변을 나누는 구역 수
+QUADRAT_SHARE = (0.35, 0.3, 0.2, 0.15)
 TRAIN, VAL, TEST = 0, 1, 2
 MIXED, WM811K = 0, 1
 
@@ -51,26 +51,17 @@ def to_float(a: torch.Tensor) -> torch.Tensor:
 
 
 def train_input(raw, core, y, g, random_index):
-    """표본별로 입력 형태를 고른다. Random 은 구조 분리로 사라지므로 원본을 쓴다."""
+    """표본마다 구역 크기를 고른다. Random 은 구조 분리로 사라지므로 원본을 쓴다."""
     n = len(raw)
     both = augment(torch.cat([to_float(raw), to_float(core)], 1))
-    r, c = both[:, :1], both[:, 1:]
-    is_random = (y[:, random_index] > 0)[:, None, None, None]
-    c = torch.where(is_random, r, c)
-    mode = torch.rand(n)
-    out = torch.zeros(n, 3, r.shape[2], r.shape[3])
-    pick = mode < 0.2
-    if pick.any():                                   # 전면 맵, 실제 잡음
-        out[pick] = full_map(r[pick], g)
-    pick = (mode >= 0.2) & (mode < 0.4)
-    if pick.any():                                   # 전면 맵, 잡음을 라벨과 무관하게 다시 입힘
+    c = torch.where((y[:, random_index] > 0)[:, None, None, None], both[:, :1], both[:, 1:])
+    out = torch.zeros(n, 3, c.shape[2], c.shape[3])
+    choice = torch.multinomial(torch.tensor(QUADRAT_SHARE), n, replacement=True)
+    for i, q in enumerate(QUADRATS):
+        pick = choice == i
         k = int(pick.sum())
-        out[pick] = full_map(c[pick], g, torch.empty(k).uniform_(0, MAX_NOISE) * (torch.rand(k) < 0.8))
-    for i, q in enumerate(QUADRATS):                 # 검사 다이 44개, 구역 판정
-        pick = (mode >= 0.4 + 0.15 * i) & (mode < 0.55 + 0.15 * i)
-        if not pick.any():
+        if not k:
             continue
-        k = int(pick.sum())
         keep = torch.where(y[pick, random_index] > 0, torch.empty(k).uniform_(0.3, 1.0), torch.ones(k))
         out[pick] = quadrat_map(c[pick], g, q, light=torch.empty(k).uniform_(0.04, 0.10), heavy=torch.empty(k).uniform_(0.25, 0.45),
                                 stray=torch.empty(k).uniform_(0, 0.08 / q ** 2) * (torch.rand(k) < 0.7), keep=keep)
@@ -100,6 +91,8 @@ def main():
     ap.add_argument("--batch", type=int, default=128)
     ap.add_argument("--lr", type=float, default=2e-3)
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--out", default=CKPT)
+    ap.add_argument("--pseudo", action="store_true", help="추가 라벨(datasets/wafer270/pseudo_*)을 학습에 더한다")
     ap.add_argument("--time-only", action="store_true")
     a = ap.parse_args()
     torch.manual_seed(a.seed)
@@ -111,15 +104,19 @@ def main():
     va = np.where(split == VAL)[0]
     raw_tr, core_tr = load_images(tr)
     y_tr = torch.from_numpy(labels[tr])
+    if a.pseudo:
+        raw_tr = torch.cat([raw_tr, torch.from_numpy(np.load(f"{DATA_DIR}/pseudo_raw.npy"))])
+        core_tr = torch.cat([core_tr, torch.from_numpy(np.load(f"{DATA_DIR}/pseudo_core.npy"))])
+        y_tr = torch.cat([y_tr, torch.from_numpy(np.load(f"{DATA_DIR}/pseudo_labels.npy").astype(np.float32))])
     raw_va, core_va = load_images(va)
     y_va = labels[va]
     pos = y_tr.sum(0)
-    weight = ((len(tr) - pos) / pos.clamp(min=1)).clamp(1, 20)
+    weight = ((len(y_tr) - pos) / pos.clamp(min=1)).clamp(1, 20)
     model = WaferNet(len(patterns))
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
-    batches = len(tr) // a.batch
+    batches = len(y_tr) // a.batch
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, a.lr, total_steps=a.epochs * batches, pct_start=0.1)
-    print("파라미터", sum(p.numel() for p in model.parameters()), "학습", len(tr), "검증", len(va),
+    print("파라미터", sum(p.numel() for p in model.parameters()), "학습", len(y_tr), "검증", len(va),
           "pos_weight", weight.numpy().round(1).tolist(), flush=True)
     os.makedirs(OUT_DIR, exist_ok=True)
     if not a.time_only:
@@ -127,7 +124,7 @@ def main():
     best, t0 = -1.0, time.time()
     for ep in range(a.epochs):
         model.train()
-        perm = torch.randperm(len(tr))
+        perm = torch.randperm(len(y_tr))
         total = 0.0
         for b in range(batches):
             ids = perm[b * a.batch:(b + 1) * a.batch]
@@ -144,17 +141,17 @@ def main():
             if a.time_only and b == 19:
                 print(f"배치당 {(time.time() - t0) / 20:.3f} s → 에폭당 {(time.time() - t0) / 20 * batches / 60:.1f} 분")
                 return
-        prob_full = 1 / (1 + np.exp(-logits_of(model, lambda r, c: full_map(r, g), raw_va, core_va)))
-        prob_die = 1 / (1 + np.exp(-logits_of(model, lambda r, c: quadrat_map(c, g, 2), raw_va, core_va)))
-        row = {"epoch": ep + 1, "loss": round(total / batches, 4), "val_full_f1": round(macro_f1(prob_full, y_va), 4),
-               "val_die_f1": round(macro_f1(prob_die, y_va), 4), "minutes": round((time.time() - t0) / 60, 1)}
+        prob_die = 1 / (1 + np.exp(-logits_of(model, lambda r, c: quadrat_map(c, g, 1), raw_va, core_va)))
+        prob_q2 = 1 / (1 + np.exp(-logits_of(model, lambda r, c: quadrat_map(c, g, 2), raw_va, core_va)))
+        row = {"epoch": ep + 1, "loss": round(total / batches, 4), "val_die_f1": round(macro_f1(prob_die, y_va), 4),
+               "val_q2_f1": round(macro_f1(prob_q2, y_va), 4), "minutes": round((time.time() - t0) / 60, 1)}
         with open(LOG, "a") as f:
             f.write(json.dumps(row) + "\n")
         print(row, flush=True)
-        score = (row["val_full_f1"] + row["val_die_f1"]) / 2
+        score = (row["val_die_f1"] + row["val_q2_f1"]) / 2
         if score > best:
             best = score
-            torch.save({"state": model.state_dict(), "patterns": patterns, "epoch": ep + 1, "seed": a.seed}, CKPT)
+            torch.save({"state": model.state_dict(), "patterns": patterns, "epoch": ep + 1, "seed": a.seed, "val_score": score}, a.out)
     print("최고 검증 점수", best, flush=True)
 
 

@@ -13,6 +13,7 @@ training/evaluate.py
 - 기존 규칙 분류기와 같은 입력으로 비교
 """
 from __future__ import annotations
+import argparse
 import json
 import os
 import sys
@@ -29,8 +30,6 @@ import wafer_model                                     # noqa: E402
 import wafer_raster as R                               # noqa: E402
 
 V1_CKPT = "models/v1/wafernet.pt"
-OUT = "models/wafernet_metrics.json"
-META = "models/calibration.json"
 BOOT = 400
 BOOT_BLOCK = 2000
 DIES = scoring.annotate(wafer_model.die_layout())
@@ -41,9 +40,8 @@ def sigmoid(x):
 
 
 def conditions(g):
-    return {"전면 맵, 실제 잡음": lambda r, c: full_map(r, g), "전면 맵, 잡음 제거": lambda r, c: full_map(c, g),
-            "44다이 6×6 구역": lambda r, c: quadrat_map(c, g, 6), "44다이 3×3 구역": lambda r, c: quadrat_map(c, g, 3),
-            "44다이 2×2 구역": lambda r, c: quadrat_map(c, g, 2), "44다이 판정": lambda r, c: quadrat_map(c, g, 1)}
+    return {f"44다이 {name}": (lambda q: lambda r, c: quadrat_map(c, g, q))(q)
+            for name, q in (("판정", 1), ("2×2 구역", 2), ("3×3 구역", 3), ("6×6 구역", 6))}
 
 
 def bce(logit, y, t):
@@ -143,9 +141,14 @@ def load_net(path, n):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ckpt", default=CKPT)
+    ap.add_argument("--tag", default="a")
+    a = ap.parse_args()
+    OUT, META = f"models/metrics_{a.tag}.json", f"models/calibration_{a.tag}.json"
     labels, split, source, wafer, patterns = load_meta()
     g = Geometry()
-    net, ck = load_net(CKPT, len(patterns))
+    net, ck = load_net(a.ckpt, len(patterns))
     training_status.report("evaluate", 0, 5, "검증 분할로 확률 보정", unit="단계")
 
     va = np.where(split == VAL)[0]
@@ -159,7 +162,7 @@ def main():
     with open(META, "w") as f:
         json.dump({"temperature": temperature, "thresholds": dict(zip(patterns, thresholds.tolist()))}, f, ensure_ascii=False, indent=2)
 
-    result = {"epoch": ck["epoch"], "temperature": temperature, "tests": {}}
+    result = {"epoch": ck["epoch"], "val_score": ck.get("val_score"), "temperature": temperature, "tests": {}}
     names = {WM811K: "WM-811K 로트 분리 시험 (실제 공장 데이터)", MIXED: "MixedWM38 시험"}
     keep = {}
     for step, src in enumerate((WM811K, MIXED), 1):
