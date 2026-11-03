@@ -451,7 +451,8 @@ class ScanService:
         if n < wafer_stitch.MIN_IMAGES:
             raise JobError(f"합성에 필요한 사진이 부족합니다 ({n}장)")
         self._phase("stitch")
-        wafer_stitch.build(scan_dir, log=log)
+        # 맵 방향은 하드웨어(갠트리 축과 웨이퍼의 관계)로 정해지므로 지금 설정을 따른다 (예전 스캔을 다시 합성할 때도)
+        wafer_stitch.build(scan_dir, log=log, flip_y=int(scan_config.load()["wafer_sign_y"]) < 0)
         self._phase("detect")
         log("결함 검출")
         try:
