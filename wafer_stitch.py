@@ -343,9 +343,11 @@ def detect_wafer(mos: np.ndarray, den: np.ndarray, s: float) -> dict | None:
             "points": int(len(inl)), "arc_deg": int(arc)}
 
 
-def measure_grid(mos: np.ndarray, den: np.ndarray, wafer: dict | None) -> dict | None:
+def measure_grid(mos: np.ndarray, den: np.ndarray, wafer: dict | None, s: float | None = None) -> dict | None:
     """격자 기울기와 피치. 회전시키며 행·열 투영의 뾰족함이 최대인 각을 찾는다.
-    테이프처럼 굵고 진한 구조가 투영을 지배하지 않도록 웨이퍼 원 안쪽만 쓴다."""
+    테이프처럼 굵고 진한 구조가 투영을 지배하지 않도록 웨이퍼 원 안쪽만 쓴다.
+    붙인 결함처럼 진한 점이 많으면 투영이 그 점들에 끌려간다. 그래서 다이 반 칸보다 긴 선 성분만 남겨 재고,
+    웨이퍼 원이 있으면 원 크기에서 나오는 피치 근처의 간격만 받아들인다."""
     H, W = mos.shape
     m = den > 0.3
     if wafer:
@@ -357,35 +359,41 @@ def measure_grid(mos: np.ndarray, den: np.ndarray, wafer: dict | None) -> dict |
     img[~m] = float(np.median(img[m]))
     hp = cv2.GaussianBlur(img, (0, 0), 1) - cv2.GaussianBlur(img, (0, 0), 8)
     hp[~cv2.erode(m.astype(np.uint8), np.ones((21, 21), np.uint8)).astype(bool)] = 0
-    hp = np.clip(hp, -0.2, 0)              # 격자선은 어두운 선
+    dark = np.clip(-hp, 0, 0.2).astype(np.float32)          # 격자선은 어두운 선
+    expected = wafer["r"] * WAFER_MODEL["pitch_mm"] / (WAFER_DIAMETER_MM / 2) if wafer else None
+    L = int(round((expected or H / 10) * 0.5)) | 1            # 반 칸보다 긴 직선만 남긴다 (점 결함 제거)
+    vert = cv2.morphologyEx(dark, cv2.MORPH_OPEN, np.ones((L, 1), np.uint8))
+    horz = cv2.morphologyEx(dark, cv2.MORPH_OPEN, np.ones((1, L), np.uint8))
     best = (0.0, -1.0)
     center = (wafer["cx"], wafer["cy"]) if wafer else (W / 2, H / 2)
     for a in np.arange(-6, 6.01, 0.25):
         M = cv2.getRotationMatrix2D(center, float(a), 1)
-        r = cv2.warpAffine(hp, M, (W, H))
-        sc = float(r.sum(0).var() + r.sum(1).var())
+        sc = float(cv2.warpAffine(vert, M, (W, H)).sum(0).var() + cv2.warpAffine(horz, M, (W, H)).sum(1).var())
         if sc > best[1]:
             best = (float(a), sc)
     angle = best[0]
-    r = cv2.warpAffine(hp, cv2.getRotationMatrix2D(center, angle, 1), (W, H))
+    M = cv2.getRotationMatrix2D(center, angle, 1)
     out, lines_by = {}, {}
-    for name, prof in (("x", r.sum(0)), ("y", r.sum(1))):
-        # 격자선은 투영의 뾰족한 골로 나타난다. 골 사이 간격의 중앙값이 피치다.
+    for name, prof in (("x", cv2.warpAffine(vert, M, (W, H)).sum(0)), ("y", cv2.warpAffine(horz, M, (W, H)).sum(1))):
+        # 격자선은 투영의 뾰족한 봉우리로 나타난다. 봉우리 사이 간격의 중앙값이 피치다.
         p = cv2.GaussianBlur(prof.reshape(1, -1).astype(np.float32), (0, 0), 2).ravel()
-        th = p.min() * 0.35
+        th = p.max() * 0.35
         lines, i = [], 0
         while i < len(p):
-            if p[i] < th:
+            if p[i] > th:
                 j = i
-                while j < len(p) and p[j] < th:
+                while j < len(p) and p[j] > th:
                     j += 1
-                lines.append(i + int(np.argmin(p[i:j])))
+                lines.append(i + int(np.argmax(p[i:j])))
                 i = j
             else:
                 i += 1
         lines_by[name] = lines
-        gaps = np.diff(lines)
-        gaps = gaps[gaps > H * 0.04]
+        gaps = np.diff(lines).astype(float)
+        if expected:
+            gaps = gaps[np.abs(gaps / expected - 1) < 0.12]
+        else:
+            gaps = gaps[gaps > H * 0.04]
         if len(gaps) >= 2:
             out[name] = float(np.median(gaps))
     if not out:
