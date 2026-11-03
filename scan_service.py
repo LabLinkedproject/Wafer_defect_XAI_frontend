@@ -22,6 +22,7 @@ import traceback
 from datetime import datetime
 
 import cv2
+import numpy as np
 
 import scan_config
 import wafer_model
@@ -37,6 +38,13 @@ from gantry_core import Gantry, Profile    # noqa: E402
 DRY = os.environ.get("WAFER_GANTRY_DRY") == "1"
 SCAN_ROOT = os.path.join("captures", "scans")
 GPIO_CHIPS = [f"/dev/gpiochip{i}" for i in range(5)]
+
+
+AE_TARGET = 100        # 촬영 노출 자동 맞춤: 사진 밝기 중앙값 목표 (0~255). 이보다 어두울 때만 올린다
+AE_TOLERANCE = 12
+AE_STEPS = 4
+AE_SETTLE_S = 0.8      # 노출을 바꾼 뒤 센서가 따라오는 시간
+AE_MIN, AE_MAX = 5, 300
 
 
 class JobError(Exception):
@@ -260,6 +268,29 @@ class ScanService:
         j["eta_s"] = round(eta) if self.job["busy"] and rows else None
         return j
 
+    def _auto_exposure(self, start: int) -> int:
+        """조명이 어두우면 웨이퍼 중심 사진의 밝기 중앙값이 목표에 오도록 노출을 올린다.
+        내리지는 않는다: 밝은 조건에서는 시작값(포화 없이 가장 밝은 값으로 잰 값)이 낫고, 조명 반사의 포화는
+        합성에서 따로 걸러낸다. 중앙값을 쓰는 이유: 반사는 사진 일부라 중앙값을 흔들지 않는다.
+        이 카메라는 노출 약 150 이상에서 프레임 시간에 막혀 밝기가 더 늘지 않는다."""
+        e = int(start)
+        for _ in range(AE_STEPS):
+            self.camera.set_exposure(e)
+            time.sleep(AE_SETTLE_S)
+            frame = self.camera.wait_new_frame(self.camera.frame_id(), timeout=2.0)
+            if frame is None:
+                break
+            small = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
+            level = float(np.median(small))
+            if level >= AE_TARGET - AE_TOLERANCE:
+                break
+            nxt = int(np.clip(round(e * AE_TARGET / max(level, 5.0)), e + 1, AE_MAX))
+            if nxt <= e:
+                break
+            e = nxt
+        self.job["message"] = f"촬영 노출 {e}"
+        return e
+
     def stop(self):
         self._stop = True
         if self._g is not None:
@@ -376,6 +407,9 @@ class ScanService:
             try:
                 if not self._move(g, st, prof, float(cfg["wafer_center_x"]), float(cfg["wafer_center_y"])):
                     return
+                if shoot is not None and cfg.get("auto_exposure"):
+                    self.job["message"] = "조명에 맞춰 촬영 노출 맞추는 중"
+                    manifest["exposure_used"] = self._auto_exposure(shoot)
                 t0 = time.monotonic()
                 for i, d in enumerate(order, 1):
                     if self._stop:

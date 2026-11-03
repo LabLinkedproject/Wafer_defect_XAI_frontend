@@ -29,6 +29,9 @@ MAX_RADIUS_RATIO = 0.62    # 합성에 쓰는 최대 반경 (영상 높이 대�
 MIN_IMAGES = 8
 MASK_NAME = "wafer_map_mask.png"
 GLARE_LEVEL = 245          # 사진들의 중앙값이 이 이상이면 조명 정반사 (카메라 상한 약 248)
+GLARE_RATIO = 1.35         # 주변(넓은 중앙값) 대비 이 배율보다 밝으면 정반사
+DIM_RATIO = 0.35           # 보통 밝기의 이 비율보다 어두운 곳(감광된 가장자리)은 합성에 쓰지 않는다
+DIM_FLOOR = 8.0
 GLARE_MARGIN = 0.06        # 반사 둘레 번짐까지 빼는 폭 (영상 높이 대비)
 WAFER_DIAMETER_MM = WAFER_MODEL["diameter_mm"]
 
@@ -38,14 +41,34 @@ def _flatfield(stack: np.ndarray, sigma: float) -> np.ndarray:
     return cv2.GaussianBlur(np.median(stack, 0), (0, 0), sigma)
 
 
-def glare_mask(light: np.ndarray) -> np.ndarray:
-    """조명 정반사로 포화된 영역 (사진 좌표). light 는 사진들의 픽셀별 중앙값이다.
-    포화 둘레의 번짐까지 빼도록 넓힌다."""
-    m = (light >= GLARE_LEVEL).astype(np.uint8)
+def glare_mask(light: np.ndarray, saturated: np.ndarray | None = None) -> np.ndarray:
+    """조명 정반사 영역 (사진 좌표). light 는 사진들의 픽셀별 중앙값이다.
+    장면은 사진마다 움직이고 카메라에 붙은 조명의 반사는 늘 같은 자리에 있으므로 중앙값에 그대로 남는다.
+    포화된 곳과, 포화되지 않았어도 주변보다 튀게 밝은 곳(어둡게 한 링 조명의 고리 등)을 함께 잡고 둘레까지 넓힌다."""
+    u8 = np.clip(light, 0, 255).astype(np.uint8)
+    k = max(31, (light.shape[0] // 6) | 1)
+    bg = cv2.medianBlur(u8, k).astype(np.float32)
+    m = (light >= GLARE_LEVEL) | (light > bg * GLARE_RATIO + 12)
+    if saturated is not None:
+        m |= saturated                     # 사진 절반 이상에서 포화된 픽셀 (중앙값·흐림을 거치면 245 아래로 내려간다)
+    m = m.astype(np.uint8)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))      # 낱점 잡음 제거
     if not m.any():
         return m.astype(bool)
     r = max(3, int(light.shape[0] * GLARE_MARGIN))
     return cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))) > 0
+
+
+def light_level(light: np.ndarray, glare: np.ndarray | None = None) -> float:
+    """조명의 보통 밝기: 반사를 뺀 곳의 중앙값"""
+    glare = glare_mask(light) if glare is None else glare
+    return float(np.median(light[~glare])) if (~glare).any() else float(np.median(light))
+
+
+def light_top(light: np.ndarray, glare: np.ndarray | None = None) -> float:
+    """조명 밝기의 기준값: 반사를 뺀 곳의 상위 밝기"""
+    glare = glare_mask(light) if glare is None else glare
+    return float(np.percentile(light[~glare], 99.5)) if (~glare).any() else float(light.max())
 
 
 def _edges(img: np.ndarray, win: np.ndarray) -> np.ndarray:
@@ -155,7 +178,7 @@ def _project(shape_out, s, c_out, B, C, u0, v0, q):
     return (x + u0).astype(np.float32), (y + v0).astype(np.float32)
 
 
-def _compose(images, flat_ref, pos, A, s, size, k, gains=None, sigma=None, color=False):
+def _compose(images, flat_ref, pos, A, s, size, k, gains=None, sigma=None, color=False, glare=None):
     """가중 평균 합성. 반환 (모자이크, 누적 가중치)"""
     h, w = images[0].shape[:2]
     u0, v0 = w / 2, h / 2
@@ -164,10 +187,11 @@ def _compose(images, flat_ref, pos, A, s, size, k, gains=None, sigma=None, color
     sigma = sigma or SIGMA_RATIO * h
     rr2 = (xx - u0) ** 2 + (yy - v0) ** 2
     w0 = np.exp(-rr2 / (2 * sigma ** 2)).astype(np.float32)
-    # 조명이 약해 잡음이 큰 영역과 렌즈 외곽은 쓰지 않는다
-    w0[(flat_ref < flat_ref.max() * 0.22) | (rr2 > (MAX_RADIUS_RATIO * h) ** 2)] = 0
-    # 투명·거울면에서는 카메라에 붙은 조명이 매 사진 같은 자리에 하얗게 비친다. 그 자리는 다른 사진으로 채운다
-    w0[glare_mask(flat_ref)] = 0
+    # 투명·거울면에서는 카메라에 붙은 조명이 매 사진 같은 자리에 비친다. 그 자리는 다른 사진으로 채운다
+    glare = glare_mask(flat_ref) if glare is None else glare
+    # 조명이 약해 잡음이 큰 영역과 렌즈 외곽은 쓰지 않는다. 기준은 반사를 뺀 보통 밝기다
+    # (가장 밝은 곳 기준이면 조명을 줄였을 때 링 조명 안쪽만 남고 사진 대부분이 버려진다)
+    w0[(flat_ref < max(light_level(flat_ref, glare) * DIM_RATIO, DIM_FLOOR)) | (rr2 > (MAX_RADIUS_RATIO * h) ** 2) | glare] = 0
     H, W = size
     c = (W / 2, H / 2)
     num = np.zeros((H, W, 3) if color else (H, W), np.float32)
@@ -195,7 +219,7 @@ def _compose(images, flat_ref, pos, A, s, size, k, gains=None, sigma=None, color
     return (num / d[..., None] if color else num / d), den
 
 
-def _estimate_gains(images, flat_ref, pos, A, s, size, k):
+def _estimate_gains(images, flat_ref, pos, A, s, size, k, glare=None):
     """사진별 밝기 맞춤: 모자이크 대비 비율로 두 번 갱신한다 (자동 노출 차이 보정)."""
     n = len(images)
     gains = np.ones(n, np.float32)
@@ -205,7 +229,7 @@ def _estimate_gains(images, flat_ref, pos, A, s, size, k):
     H, W = size
     c = (W / 2, H / 2)
     for _ in range(2):
-        mos, den = _compose(images, flat_ref, pos, A, s, size, k, gains)
+        mos, den = _compose(images, flat_ref, pos, A, s, size, k, gains, glare=glare)
         for i, img in enumerate(images):
             # 영상 중심부 픽셀 → 모자이크 좌표 (중심부는 왜곡이 작아 무시한다)
             ys, xs = np.mgrid[int(h * 0.3):int(h * 0.7):6, int(w * 0.3):int(w * 0.7):6]
@@ -239,7 +263,7 @@ def refine_camera(flat, light, pos, A0, pairs) -> dict:
     yy, xx = np.mgrid[0:h:2, 0:w:2].astype(np.float32)
     dx, dy = xx - u0, yy - v0
     rr = np.hypot(dx, dy)
-    use = (cv2.resize(light, (xx.shape[1], xx.shape[0])) > light.max() * 0.15) & (rr < 0.95 * h)
+    use = (cv2.resize(light, (xx.shape[1], xx.shape[0])) > max(light_level(light) * DIM_RATIO, DIM_FLOOR)) & (rr < 0.95 * h)
 
     def score(f, theta, q):
         c, sn = math.cos(theta), math.sin(theta)
@@ -452,7 +476,9 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
 
     log("조명 평탄화")
     light = _flatfield(np.stack(small), 10)
-    floor = max(light.max() * 0.05, 6)
+    saturated = np.mean([x >= GLARE_LEVEL for x in small], 0) >= 0.5
+    glare = glare_mask(light, saturated)
+    floor = max(light_top(light, glare) * 0.05, 6)
     flat = [s / np.maximum(light, floor) for s in small]
 
     log("카메라 축척·방향 측정")
@@ -491,10 +517,10 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
     log(f"축척 {scale_mm / WORK_SCALE:.2f} px/mm, 왜곡 {k * flat[0].shape[0] ** 2:.3f}, 일치도 {fine['ncc_before']} → {fine['ncc_after']}")
 
     log("밝기 맞춤")
-    gains = _estimate_gains(flat, light, cpos, A, s, size, k)
+    gains = _estimate_gains(flat, light, cpos, A, s, size, k, glare)
 
     log("합성")
-    mos_g, den_g = _compose(flat, light, cpos, A, s, size, k, gains)
+    mos_g, den_g = _compose(flat, light, cpos, A, s, size, k, gains, glare=glare)
 
     log("웨이퍼·격자 측정")
     wafer = detect_wafer(mos_g, den_g, s)
@@ -516,7 +542,8 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
         lc = light
     white = np.maximum(lc, floor)
     imgs = [x / white[..., None] for x in imgs]
-    rgb, den = _compose(imgs, lc, cpos, Ac, S, SZ, kc, gains, color=True)
+    glare_c = glare if lc.shape == light.shape else cv2.resize(glare.astype(np.uint8), (lc.shape[1], lc.shape[0])) > 0
+    rgb, den = _compose(imgs, lc, cpos, Ac, S, SZ, kc, gains, color=True, glare=glare_c)
     mask = den > 0.02
     # 조명 색 보정: 채널별 밝기를 맞춰 LED 색이 웨이퍼 색으로 보이지 않게 한다
     med = np.median(rgb[mask], 0)
@@ -535,7 +562,7 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
     center_g = (pos.max(0) + pos.min(0)) / 2
     result = {
         "images": len(dies), "map": name, "mask": MASK_NAME, "size_px": [SZ[1], SZ[0]],
-        "glare_pct": round(float(glare_mask(light).mean() * 100), 1),
+        "glare_pct": round(float(glare.mean() * 100), 1),
         "camera": {"px_per_mm_full": round(scale_mm / WORK_SCALE, 3), "rotation_deg": round(cam["theta_deg"], 2),
                    "mirrored": cam["mirrored"], "fov_mm": [round(bgr[0].shape[1] / (scale_mm / WORK_SCALE), 1),
                                                           round(bgr[0].shape[0] / (scale_mm / WORK_SCALE), 1)]},
