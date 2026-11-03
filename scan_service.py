@@ -307,24 +307,31 @@ class ScanService:
             manifest = {"started": datetime.now().isoformat(timespec="seconds"),
                         "spec": plan["spec"], "config": cfg, "dies": []}
             self.job.update(total=len(order), message="웨이퍼 중심으로 이동")
-            if not self._move(g, st, prof, float(cfg["wafer_center_x"]), float(cfg["wafer_center_y"])):
-                return
-            t0 = time.monotonic()
-            for i, d in enumerate(order, 1):
-                if self._stop:
-                    break
-                self.job["message"] = f"다이 {d['id']} (행 {d['row'] + 1}, 열 {d['col'] + 1}) 촬영 중 [{i}/{len(order)}]"
-                if not self._move(g, st, prof, d["gx"], d["gy"]):
-                    break
-                full, thumb = self._snap(out, f"die{d['id']:02d}_r{d['row']}c{d['col']}", cfg, float(cfg["dwell_s"]))
-                rec = {**d, "file": full, "thumb": thumb,
-                       "pos": {"x": round(st["x_mm"], 3), "y": round(st["y_mm"], 3)},
-                       "t": round(time.monotonic() - t0, 2)}
-                self.scan["results"].append(rec)
-                manifest["dies"].append(rec)
-                self.job["progress"] = i
-                with open(os.path.join(out, "manifest.json"), "w") as f:
-                    json.dump(manifest, f, ensure_ascii=False, indent=2)
+            shoot = cfg.get("scan_exposure")
+            if shoot is not None:
+                self.camera.set_exposure(shoot)             # 중심으로 가는 동안 노출이 자리 잡는다
+            try:
+                if not self._move(g, st, prof, float(cfg["wafer_center_x"]), float(cfg["wafer_center_y"])):
+                    return
+                t0 = time.monotonic()
+                for i, d in enumerate(order, 1):
+                    if self._stop:
+                        break
+                    self.job["message"] = f"다이 {d['id']} (행 {d['row'] + 1}, 열 {d['col'] + 1}) 촬영 중 [{i}/{len(order)}]"
+                    if not self._move(g, st, prof, d["gx"], d["gy"]):
+                        break
+                    full, thumb = self._snap(out, f"die{d['id']:02d}_r{d['row']}c{d['col']}", cfg, float(cfg["dwell_s"]))
+                    rec = {**d, "file": full, "thumb": thumb,
+                           "pos": {"x": round(st["x_mm"], 3), "y": round(st["y_mm"], 3)},
+                           "t": round(time.monotonic() - t0, 2)}
+                    self.scan["results"].append(rec)
+                    manifest["dies"].append(rec)
+                    self.job["progress"] = i
+                    with open(os.path.join(out, "manifest.json"), "w") as f:
+                        json.dump(manifest, f, ensure_ascii=False, indent=2)
+            finally:
+                if shoot is not None:
+                    self.camera.set_exposure(cfg["exposure"])   # 화면은 다시 사람이 보기 편한 밝기로
             manifest["finished"] = datetime.now().isoformat(timespec="seconds")
             manifest["stopped"] = self._stop
             with open(os.path.join(out, "manifest.json"), "w") as f:

@@ -111,8 +111,9 @@ def create_scan_blueprint(camera) -> Blueprint:
             for k in ("wafer_sign_x", "wafer_sign_y"):
                 if k in d:
                     changes[k] = -1 if int(d[k]) < 0 else 1
-            if "exposure" in d:
-                changes["exposure"] = None if d["exposure"] in (None, "", "auto") else max(1, min(5000, int(d["exposure"])))
+            for k in ("exposure", "scan_exposure"):
+                if k in d:
+                    changes[k] = None if d[k] in (None, "", "auto") else max(1, min(5000, int(d[k])))
         except (TypeError, ValueError):
             return fail("설정 값 형식이 올바르지 않습니다")
         cfg = scan_config.update(**changes)
