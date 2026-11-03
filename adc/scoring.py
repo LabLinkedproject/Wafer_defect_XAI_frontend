@@ -2,8 +2,8 @@
 adc/scoring.py
 다이 맵 → 공간 특징 → 8종 복수 라벨 점수 + XAI(기여도 분해, 다이 가림 시험, 반사실 설명).
 
-predict(dies, defects) 가 분류기의 교체 지점이다.
-같은 형태의 결과를 돌려주는 CNN 추론으로 바꿔도 occlusion / counterfactual 은 그대로 동작한다.
+분류기는 scores(drop) 와 threshold(패턴) 를 가진 객체다. RuleModel 이 규칙 기반이고,
+adc/cnn.Model 이 학습 모델이다. 다이 가림 시험과 반사실은 분류기 종류와 상관없이 같은 방법으로 계산한다.
 """
 from __future__ import annotations
 import math
@@ -181,36 +181,45 @@ def predict(dies: list[dict], defects: dict[int, dict]) -> dict:
     return results
 
 
-def labels_from(scores: dict) -> list[str]:
-    return sorted((c for c, s in scores.items() if s["score"] >= LABEL_THRESHOLD),
-                  key=lambda c: scores[c]["score"], reverse=True)
+class RuleModel:
+    """규칙 기반 공간 특징 분류기"""
+    kind = "rule"
+
+    def __init__(self, dies: list[dict], defects: dict[int, dict]):
+        self.dies, self.defects = dies, defects
+        self.ids = sorted(defects)
+
+    def scores(self, drop=()) -> dict:
+        return predict(self.dies, {k: v for k, v in self.defects.items() if k not in drop})
+
+    def threshold(self, cls: str) -> float:
+        return LABEL_THRESHOLD
 
 
-def occlusion_map(dies, defects, target: str, base_score: float) -> dict[int, float]:
+def labels_from(scores: dict, model=None) -> list[str]:
+    thr = (lambda c: model.threshold(c)) if model else (lambda c: LABEL_THRESHOLD)
+    return sorted((c for c, s in scores.items() if s["score"] >= thr(c)), key=lambda c: scores[c]["score"], reverse=True)
+
+
+def occlusion_map(model, target: str, base_score: float) -> dict[int, float]:
     """다이 가림 시험: 결함 다이를 하나씩 지우고 target 점수가 얼마나 변하는지 잰다.
-    양수면 그 다이가 판정을 지지하고, 음수면 판정을 방해한다. 모델 내부를 몰라도 되는 방법이라
-    CNN 으로 교체해도 그대로 쓸 수 있다."""
-    out = {}
-    for i in defects:
-        rest = {k: v for k, v in defects.items() if k != i}
-        out[i] = round(base_score - predict(dies, rest)[target]["score"], 4)
-    return out
+    양수면 그 다이가 판정을 지지하고, 음수면 판정을 방해한다. 모델 내부를 몰라도 되는 방법이다."""
+    return {i: round(base_score - model.scores({i})[target]["score"], 4) for i in model.ids}
 
 
-def counterfactual(dies, defects, target: str, relevance: dict[int, float], max_steps: int = 14) -> dict:
+def counterfactual(model, target: str, relevance: dict[int, float], max_steps: int = 14) -> dict:
     """target 판정이 사라지는 최소 근사 다이 집합을 탐욕적으로 찾는다."""
-    current = dict(defects)
     removed = []
     order = sorted(relevance, key=relevance.get, reverse=True)
+    scores = model.scores()
     for i in order[:max_steps]:
-        current.pop(i, None)
         removed.append(i)
-        scores = predict(dies, current)
-        if scores[target]["score"] < LABEL_THRESHOLD:
-            labels = labels_from(scores)
+        scores = model.scores(set(removed))
+        if scores[target]["score"] < model.threshold(target):
+            labels = labels_from(scores, model)
             return {"found": True, "dies": removed, "target": target,
                     "after": labels[0] if labels else "Normal",
                     "after_score": round(scores[labels[0]]["score"], 3) if labels else None,
                     "target_after": scores[target]["score"]}
     return {"found": False, "dies": removed, "target": target, "after": None,
-            "after_score": None, "target_after": predict(dies, current)[target]["score"]}
+            "after_score": None, "target_after": scores[target]["score"]}

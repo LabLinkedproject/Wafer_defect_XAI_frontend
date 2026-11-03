@@ -176,6 +176,8 @@
     mapKey = key;
     $("mapEmpty").hidden = true;
     $("mapMeta").textContent = `${m.dir} · ${m.images}장 합성 · ${m.seconds}초`;
+    $("btnAnalyze").href = `/analysis?scan=${encodeURIComponent(m.dir)}`;
+    $("btnAnalyze").hidden = !m.wafer;
     if (m.wafer) WaferView.draw($("mapView"), m, { grid: $("mapGrid").checked });
     else $("mapView").innerHTML = `<img src="${m.url}" alt="합성 웨이퍼 맵" style="width:100%">`;
     const w = m.wafer, g = m.grid, c = m.camera;

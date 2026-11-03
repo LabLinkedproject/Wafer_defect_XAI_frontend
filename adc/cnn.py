@@ -6,6 +6,7 @@ adc/cnn.py
 """
 from __future__ import annotations
 import json
+import math
 import os
 import threading
 
@@ -55,3 +56,28 @@ def from_detection(dies: list[dict], quadrats: dict, per_die: int = 2) -> dict:
     """wafer_detect 의 구역 판정을 패턴 판정으로 바꾼다."""
     s = scores(R.from_quadrats(dies, quadrats, per_die))
     return {"scores": s, "labels": labels(s)}
+
+
+class Model:
+    """학습 모델 분류기. 입력은 검출이 만든 다이 구역 판정이다.
+    다이를 가리면 그 다이의 구역을 모두 지우고 다시 추론한다. 점수 옆에는 같은 입력의 규칙 기반 해석을 붙인다."""
+    kind = "cnn"
+
+    def __init__(self, dies: list[dict], quadrats: dict, rule, per_die: int = 2):
+        self.dies, self.quadrats, self.rule, self.per_die = dies, quadrats, rule, per_die
+        self.ids = sorted({k[0] for k in quadrats})
+        self.thr = _load()[1]["thresholds"]
+
+    def threshold(self, cls: str) -> float:
+        return float(self.thr[cls])
+
+    def scores(self, drop=()) -> dict:
+        q = {k: v for k, v in self.quadrats.items() if k[0] not in drop}
+        s = scores(R.from_quadrats(self.dies, q, self.per_die))
+        rule = self.rule.scores() if not drop else {}
+        out = {}
+        for c, v in s.items():
+            p = min(max(v, 1e-6), 1 - 1e-6)
+            out[c] = {"score": v, "logit": round(math.log(p / (1 - p)), 3), "channel": "cnn", "bias": None,
+                      "contributions": rule.get(c, {}).get("contributions", []), "rule": rule.get(c)}
+        return out

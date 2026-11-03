@@ -64,5 +64,44 @@ class ActiveInference(unittest.TestCase):
         self.assertEqual(run("normal")["belief"]["hypotheses"], [])
 
 
+class ScanPath(unittest.TestCase):
+    """실측 스캔 경로: 검출 구역 판정 → 학습 모델 판정 → 가림·반사실 → 원인 추론.
+    입력은 시연용 인쇄 배치(다이 4등분 구역 중앙에 5 mm 파티클)와 같은 구역 판정이다."""
+
+    @staticmethod
+    def quadrats(inside):
+        out = {}
+        for d in DIES:
+            for qr in (0, 1):
+                for qc in (0, 1):
+                    x, y = d["x_mm"] + (qc - 0.5) * 16, d["y_mm"] - (qr - 0.5) * 16
+                    if inside(x, y):
+                        out[(d["id"], qr, qc)] = 1.0
+        return out
+
+    def analyze(self, q):
+        from adc import cnn
+        if not cnn.available():
+            self.skipTest("학습 모델 파일 없음")
+        defects = {}
+        for (i, _, _) in q:
+            defects.setdefault(i, {"particle": 0, "scratch": 0, "stain": 0})["particle"] += 1
+        model = cnn.Model(DIES, q, scoring.RuleModel(DIES, defects))
+        return engine.analyze(DIES, WAFER_MODEL, defects, None, None, model)
+
+    def test_center_layout(self):
+        r = self.analyze(self.quadrats(lambda x, y: (x * x + y * y) ** 0.5 < 30))
+        self.assertEqual(r["labels"], ["Center"])
+        self.assertEqual(r["model"]["kind"], "cnn")
+        self.assertTrue(r["xai"]["counterfactual"]["found"])
+        self.assertTrue(r["belief"]["hypotheses"])
+        self.assertIsNotNone(r["xai"]["rule"])
+
+    def test_donut_layout(self):
+        r = self.analyze(self.quadrats(lambda x, y: 45 < (x * x + y * y) ** 0.5 < 75))
+        self.assertEqual(r["labels"], ["Donut"])
+        self.assertTrue(r["belief"]["checks"])
+
+
 if __name__ == "__main__":
     unittest.main()

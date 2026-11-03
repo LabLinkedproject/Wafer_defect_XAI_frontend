@@ -65,16 +65,20 @@
     const sp = S.spec;
     $("spec-line").textContent = `${sp.diameter_mm} mm · ${sp.die_count}다이 · 피치 ${sp.pitch_mm} mm · ADC + XAI 공정 피드백`;
     const sel = $("scenario");
-    if (!sel.options.length) {
-      sel.innerHTML = S.scenarios.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
-    }
-    sel.value = S.session.scenario;
+    const opts = (S.scans.length ? `<optgroup label="실측 스캔">${S.scans.map((c) => `<option value="scan:${esc(c.id)}">${esc(c.name)}</option>`).join("")}</optgroup>` : "") +
+      `<optgroup label="시뮬레이션">${S.scenarios.map((c) => `<option value="sim:${esc(c.id)}">${esc(c.name)}</option>`).join("")}</optgroup>`;
+    if (sel.dataset.opts !== opts) { sel.innerHTML = opts; sel.dataset.opts = opts; }
+    const ss = S.session;
+    sel.value = ss.source === "scan" ? `scan:${ss.scan_id}` : `sim:${ss.scenario}`;
     for (const [k, e] of Object.entries(S.engines)) {
       $(`eng-${k}`).textContent = e.now;
     }
-    const edited = S.session.edited ? " · 다이를 수정한 상태" : "";
-    $("simbar").textContent = `시뮬레이션 입력: ${S.session.scenario_name} (${S.session.scenario_note})${edited}. ` +
-      "검출과 분류는 학습 모델 연결 전 규칙 기반 결과입니다.";
+    const edited = ss.edited ? " · 엔지니어가 다이를 수정한 상태" : "";
+    const bar = $("simbar");
+    bar.classList.toggle("live", ss.source === "scan");
+    bar.textContent = ss.source === "scan"
+      ? `실측 스캔 입력: ${ss.scan_name} · 검사 다이 ${ss.inspected}/${S.spec.die_count} · 검출 ${ss.found}건${edited}. 패턴 판정은 ${S.model.name}입니다.`
+      : `시뮬레이션 입력: ${ss.scenario_name} (${ss.scenario_note})${edited}. 검출은 시뮬레이션, 분류는 규칙 기반입니다.`;
   }
 
   function renderVerdict() {
@@ -106,23 +110,34 @@
   function renderInput() {
     const map = S.wafer_map;
     const usable = !!(map && map.wafer);
+    const scan = S.session.source === "scan";
+    if (scan && usable) inputMode = "real";
     if (inputMode === null || (inputMode === "real" && !usable)) inputMode = usable ? "real" : "sim";
     const real = inputMode === "real";
     document.querySelectorAll("#input-modes button").forEach((b) => {
       b.classList.toggle("on", b.dataset.v === inputMode);
-      b.disabled = b.dataset.v === "real" && !usable;
+      b.disabled = (b.dataset.v === "real" && !usable) || (b.dataset.v === "sim" && scan);
     });
     $("input-title").textContent = real ? "웨이퍼 맵" : "입력 이미지";
     $("real-view").hidden = !real;
     $("input-img").hidden = real;
     $("input-overlay").style.display = real ? "none" : "";
-    $("overlay-wrap").hidden = real;
+    $("overlay-wrap").hidden = real && !scan;
     $("grid-wrap").hidden = !real;
     if (real) {
-      WaferView.draw($("real-view"), map, { grid: $("show-grid").checked, selected: selected });
+      const marks = scan && $("show-overlay").checked ? S.found.map((f) => ({
+        x_mm: f.x_mm, y_mm: f.y_mm, r_mm: Math.max(2.5, Math.sqrt(f.area_mm2 / Math.PI) + 1.5),
+        color: css(TYPE_COLOR[f.type]), title: `다이 ${f.die} · ${S.types[f.type].ko} · ${f.area_mm2} mm²`,
+      })) : null;
+      WaferView.draw($("real-view"), map, { grid: $("show-grid").checked, selected: selected, marks, pitchMm: S.spec.pitch_mm });
       const cov = map.coverage_pct;
-      $("input-note").textContent = `촬영 ${map.images}장을 한 장으로 합성 · 웨이퍼 커버리지 ${cov}%` +
-        (cov < 98 ? ". 스캔 콘솔에서 정렬 후 재스캔하면 전체를 담습니다." : "");
+      if (scan) {
+        const by = Object.values(S.types).filter((t) => t.count).map((t) => `${t.ko} ${t.count}`).join(" · ") || "결함 없음";
+        $("input-note").textContent = `촬영 ${map.images}장 합성 맵 · 커버리지 ${cov}% · 기준 다이 비교로 검출 ${S.found.length}건 (${by})`;
+      } else {
+        $("input-note").textContent = `촬영 ${map.images}장을 한 장으로 합성 · 웨이퍼 커버리지 ${cov}%` +
+          (cov < 98 ? ". 스캔 콘솔에서 정렬 후 재스캔하면 전체를 담습니다." : "");
+      }
       return;
     }
     const img = $("input-img");
@@ -237,7 +252,7 @@
     const counts = Object.entries(d.counts).filter(([, v]) => v).map(([k, v]) => `${S.types[k].ko} ${v}`).join(", ") || "없음";
     const dose = (t, n, label) => `<button type="button" class="btn" data-edit="${t}" data-n="${n}">${label}</button>`;
     body.innerHTML = `
-      ${canCrop ? `<canvas class="die-photo" id="die-crop" width="320" height="320" role="img" aria-label="합성 맵의 다이 ${d.id} 위치"></canvas><p class="note photo-note">합성 맵의 이 다이 위치 (아래 결함은 ${S.session.edited ? "수정된 " : ""}시뮬레이션 입력값)</p>` : ""}
+      ${canCrop ? `<canvas class="die-photo" id="die-crop" width="320" height="320" role="img" aria-label="합성 맵의 다이 ${d.id} 위치"></canvas><p class="note photo-note">합성 맵의 이 다이 위치 (아래 결함은 ${S.session.edited ? "수정된 " : ""}${S.session.source === "scan" ? "검출 결과" : "시뮬레이션 입력값"})</p>` : ""}
       <dl class="facts">
         <dt>다이</dt><dd>${d.id}번 (행 ${d.row + 1}, 열 ${d.col + 1})</dd>
         <dt>위치</dt><dd>${d.x_mm}, ${d.y_mm} mm</dd>
@@ -265,11 +280,13 @@
     box.innerHTML = rows.map((p) => `
       <button type="button" class="bar-row${S.xai.target === p.name ? " sel" : ""}" data-t="${esc(p.name)}" title="${esc(p.desc)}">
         <span class="name">${esc(p.name)}</span>
-        <span class="bar-track"><span class="bar-fill${p.is_label ? " on" : ""}" style="width:${p.score * 100}%"></span><span class="bar-mark" style="left:${S.threshold * 100}%"></span></span>
+        <span class="bar-track"><span class="bar-fill${p.is_label ? " on" : ""}" style="width:${p.score * 100}%"></span><span class="bar-mark" style="left:${p.threshold * 100}%"></span></span>
         <span class="bar-val">${p.score.toFixed(2)}</span>
       </button>`).join("");
     box.querySelectorAll("button").forEach((b) => { b.onclick = () => act("/api/adc/target", { target: b.dataset.t }); });
-    $("thr-note").textContent = `눈금 = 판정선 ${S.threshold}. 넘은 패턴은 모두 라벨`;
+    $("thr-note").textContent = S.model.kind === "cnn"
+      ? `${S.model.name} · 눈금 = 패턴별 판정선. 넘은 패턴은 모두 라벨`
+      : `눈금 = 판정선 ${S.threshold}. 넘은 패턴은 모두 라벨`;
   }
 
   function renderTypes() {
@@ -334,11 +351,15 @@
     const x = S.xai;
     $("xai-title").textContent = `${x.target} 판정 근거`;
     drawMap($("xai-mini"), "xai", false);
-    const chan = { all: "전체", stain: "스테인", scratch: "스크래치", particle: "파티클" }[x.channel] || "-";
-    $("xai-meta").textContent = `점수 ${x.score.toFixed(2)} · ${chan} 채널 기준`;
-    const list = x.contributions.filter((c) => Math.abs(c.impact) >= 0.01);
-    const items = [{ label: "기준값", value: null, impact: x.bias }, ...list];
-    const max = Math.max(1, ...items.map((c) => Math.abs(c.impact)), Math.abs(x.logit));
+    const chan = { all: "전체", stain: "스테인", scratch: "스크래치", particle: "파티클" };
+    const ex = x.rule || x;            // 막대 = 공간 특징 기여 (학습 모델일 때는 같은 입력의 규칙 기반 해석)
+    $("xai-meta").textContent = x.rule
+      ? `학습 모델 점수 ${x.score.toFixed(2)} · 다이 지도와 반사실은 학습 모델 기준 · 막대는 규칙 기반 공간 특징 해석 (규칙 점수 ${x.rule.score.toFixed(2)})`
+      : `점수 ${x.score.toFixed(2)} · ${chan[x.channel] || "-"} 채널 기준`;
+    const list = (ex.contributions || []).filter((c) => Math.abs(c.impact) >= 0.01);
+    const items = [{ label: "기준값", value: null, impact: ex.bias ?? 0 }, ...list];
+    const logit = ex.logit ?? 0;
+    const max = Math.max(1, ...items.map((c) => Math.abs(c.impact)), Math.abs(logit));
     const bar = (v) => {
       const w = (Math.abs(v) / max) * 50;
       return `<span class="c-bar ${v >= 0 ? "pos" : "neg"}" style="${v >= 0 ? `left:50%` : `left:${50 - w}%`};width:${w}%"></span>`;
@@ -346,14 +367,14 @@
     $("contrib").innerHTML = items.map((c) => `
       <div class="c-row"><span class="lbl">${esc(c.label)}${c.value === null ? "" : ` <small>${c.value.toFixed(2)}</small>`}</span>
       <span class="c-axis">${bar(c.impact)}</span><span class="val">${c.impact >= 0 ? "+" : ""}${c.impact.toFixed(2)}</span></div>`).join("") +
-      `<div class="c-row total"><span class="lbl">합계 (로그오즈)</span><span class="c-axis">${bar(x.logit)}</span><span class="val">${x.logit >= 0 ? "+" : ""}${x.logit.toFixed(2)}</span></div>`;
+      `<div class="c-row total"><span class="lbl">합계 (로그오즈)</span><span class="c-axis">${bar(logit)}</span><span class="val">${logit >= 0 ? "+" : ""}${logit.toFixed(2)}</span></div>`;
 
     const cf = x.counterfactual;
     let html;
     if (cf.found) {
       html = `<p class="cf">결함 다이 <strong>${cf.dies.length}개</strong>가 없었다면 판정은 <strong>${esc(cf.target)}</strong>에서 <strong>${esc(cf.after)}</strong>로 바뀝니다.</p>
         <div class="ids">${cf.dies.map((i) => `<span>${i}</span>`).join("")}</div>`;
-    } else if (x.score >= S.threshold) {
+    } else if (x.score >= x.threshold) {
       html = `<p class="cf">결함 다이 ${cf.dies?.length ?? 0}개를 지워도 <strong>${esc(x.target)}</strong> 판정이 유지됩니다. 분포가 넓게 지지하는 판정입니다.</p>`;
     } else {
       html = `<p class="cf">${esc(x.target)}은(는) 판정선 아래라 반사실을 계산하지 않습니다.</p>`;
@@ -453,7 +474,11 @@
   }
 
   // ── 이벤트 ───────────────────────────────────────────────────
-  $("scenario").onchange = (e) => { selected = null; act("/api/adc/scenario", { id: e.target.value }); };
+  $("scenario").onchange = (e) => {
+    selected = null;
+    const [kind, id] = e.target.value.split(/:(.*)/s);
+    act(kind === "scan" ? "/api/adc/scan" : "/api/adc/scenario", { id });
+  };
   $("map-modes").onclick = (e) => {
     const b = e.target.closest("button");
     if (!b) return;
@@ -512,6 +537,10 @@
   (async () => {
     try {
       S = await api("/api/adc/state");
+      const want = new URLSearchParams(location.search).get("scan");
+      const latest = S.scans[0]?.id;
+      if (want && want !== S.session.scan_id) S = await api("/api/adc/scan", { id: want });
+      else if (!want && S.session.source === "scan" && latest && latest !== S.session.scan_id) S = await api("/api/adc/scan", { id: latest });
       render();
     } catch (e) {
       $("errbar").textContent = `상태를 불러오지 못했습니다: ${e.message}`;

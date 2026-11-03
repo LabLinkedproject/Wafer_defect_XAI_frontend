@@ -14,10 +14,18 @@ from .knowledge import (CHECKS, DEFECT_TYPES, HYPOTHESES, LABEL_THRESHOLD, PATTE
 SYSTEMATIC_BONUS = 15          # 구조적 패턴이면 더하는 위험도
 ZONE_KO = {"center": "중앙", "middle": "중간", "edge": "엣지"}
 ENGINES = {
-    "detector":   {"stage": "검출", "now": "시나리오 시뮬레이션", "next": "YOLOv8", "live": False},
-    "classifier": {"stage": "분류", "now": "규칙 기반 공간 특징 분류기", "next": "CNN (WM-811K 8종)", "live": False},
-    "explainer":  {"stage": "설명", "now": "기여도 분해 · 다이 가림 시험 · 반사실", "next": "Grad-CAM 병행", "live": True},
-    "inference":  {"stage": "추론", "now": "베이즈 갱신 + 정보 이득 질의", "next": "로그 연동·우도 학습", "live": True},
+    "scan": {
+        "detector":   {"stage": "검출", "now": "기준 다이 비교 검출 (실측 맵)", "next": "실물 라벨로 검출 기준 보정", "live": True},
+        "classifier": {"stage": "분류", "now": "학습 모델 WaferNet (CNN, 8종)", "next": "실물 판정 기록으로 재학습", "live": True},
+        "explainer":  {"stage": "설명", "now": "다이 가림 시험 · 반사실 (학습 모델) + 규칙 기반 특징 해석", "next": "Grad-CAM 병행", "live": True},
+        "inference":  {"stage": "추론", "now": "베이즈 갱신 + 정보 이득 질의", "next": "로그 연동·우도 학습", "live": True},
+    },
+    "scenario": {
+        "detector":   {"stage": "검출", "now": "시나리오 시뮬레이션", "next": "실측 스캔 입력", "live": False},
+        "classifier": {"stage": "분류", "now": "규칙 기반 공간 특징 분류기", "next": "학습 모델 (실측 스캔 입력 시)", "live": False},
+        "explainer":  {"stage": "설명", "now": "기여도 분해 · 다이 가림 시험 · 반사실", "next": "Grad-CAM 병행", "live": True},
+        "inference":  {"stage": "추론", "now": "베이즈 갱신 + 정보 이득 질의", "next": "로그 연동·우도 학습", "live": True},
+    },
 }
 _HYP = {h["id"]: h for h in HYPOTHESES}
 _CHECK = {c["id"]: c for c in CHECKS}
@@ -100,13 +108,15 @@ def _build_trace(ctx: dict) -> list[dict]:
     return t
 
 
-def analyze(dies, spec, defects, answers=None, target=None) -> dict:
-    """dies: scoring.annotate 결과, defects: {다이 id: {유형: 개수}}, answers: [{check, answer}]"""
+def analyze(dies, spec, defects, answers=None, target=None, model=None) -> dict:
+    """dies: scoring.annotate 결과, defects: {다이 id: {유형: 개수}}, answers: [{check, answer}]
+    model: 분류기 (없으면 규칙 기반). 학습 모델이면 판정·다이 가림·반사실을 그 모델로 계산한다."""
     answers = answers or []
     defects = {i: c for i, c in defects.items() if sum(c.values()) > 0}
 
-    scores = S.predict(dies, defects)
-    labels = S.labels_from(scores)
+    model = model or S.RuleModel(dies, defects)
+    scores = model.scores()
+    labels = S.labels_from(scores, model)
     ordered = sorted(PATTERNS, key=lambda c: scores[c]["score"], reverse=True)
     top = labels[0] if labels else None
     second = scores[ordered[1]]["score"]
@@ -116,8 +126,8 @@ def analyze(dies, spec, defects, answers=None, target=None) -> dict:
     # XAI 대상: 지정이 없으면 1순위 라벨
     tgt = target if target in PATTERNS else (top or ordered[0])
     base = scores[tgt]["score"]
-    relevance = S.occlusion_map(dies, defects, tgt, base) if defects else {}
-    cf = S.counterfactual(dies, defects, tgt, relevance) if (defects and base >= LABEL_THRESHOLD) else {"found": False}
+    relevance = S.occlusion_map(model, tgt, base) if model.ids else {}
+    cf = S.counterfactual(model, tgt, relevance) if (model.ids and base >= model.threshold(tgt)) else {"found": False}
 
     # 다이·존·유형 집계
     die_rows, stats = [], {"active": len(dies), "normal": 0, "light": 0, "heavy": 0}
@@ -205,7 +215,8 @@ def analyze(dies, spec, defects, answers=None, target=None) -> dict:
 
     detections, stain = render.detect_regions(dies, defects, spec["pitch_mm"], spec["diameter_mm"])
     return {
-        "engines": ENGINES,
+        "engines": ENGINES["scan" if model.kind == "cnn" else "scenario"],
+        "model": {"kind": model.kind, "name": "학습 모델 WaferNet" if model.kind == "cnn" else "규칙 기반 분류기"},
         "spec": {"diameter_mm": round(spec["diameter_mm"], 1), "pitch_mm": spec["pitch_mm"],
                  "min_die_area": spec["min_die_area"], "die_count": len(dies), "grid": spec["grid"],
                  "active_radius_mm": round(active_radius(spec), 2)},
@@ -216,11 +227,11 @@ def analyze(dies, spec, defects, answers=None, target=None) -> dict:
         "dominant_zone": dominant_zone, "dominant_type": dominant_type,
         "threshold": LABEL_THRESHOLD,
         "patterns": [{"name": c, **PATTERNS[c], "score": scores[c]["score"], "channel": scores[c]["channel"],
-                      "is_label": c in labels} for c in PATTERNS],
+                      "threshold": model.threshold(c), "is_label": c in labels} for c in PATTERNS],
         "labels": labels, "top": top, "top_score": top_score, "margin": margin, "ambiguous": bool(labels) and margin < 0.2,
         "xai": {"target": tgt, "score": scores[tgt]["score"], "logit": scores[tgt]["logit"], "bias": scores[tgt]["bias"],
                 "channel": scores[tgt]["channel"], "contributions": scores[tgt]["contributions"],
-                "counterfactual": cf},
+                "threshold": model.threshold(tgt), "rule": scores[tgt].get("rule"), "counterfactual": cf},
         "belief": {"hypotheses": hyp_list, "checks": checks, "history": history, "converged": converged,
                    "entropy": h_now, "answered": [a["check"] for a in answers]},
         "risk": risk, "yield": yld, "projected": projected, "recipe": recipe,

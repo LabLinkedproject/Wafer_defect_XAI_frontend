@@ -26,6 +26,7 @@ import cv2
 import scan_config
 import wafer_model
 import wafer_stitch
+from adc import scan_input
 
 MOTOR_DIR = os.environ.get("MOTOR_DIR", "/home/orangepi/motor_test")
 if MOTOR_DIR not in sys.path:
@@ -352,6 +353,11 @@ class ScanService:
         if n < wafer_stitch.MIN_IMAGES:
             raise JobError(f"합성에 필요한 사진이 부족합니다 ({n}장)")
         wafer_stitch.build(scan_dir, log=log)
+        log("결함 검출")
+        try:
+            scan_input.detect(os.path.basename(scan_dir.rstrip("/")))   # 분석 화면이 바로 쓰도록 미리 계산
+        except Exception as e:                                          # 맵은 이미 저장됐다. 분석 화면이 다시 시도한다
+            log(f"결함 검출 실패 ({e})")
 
     @staticmethod
     def _full_scans():

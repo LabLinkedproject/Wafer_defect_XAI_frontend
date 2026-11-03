@@ -33,6 +33,16 @@ def create_adc_blueprint() -> Blueprint:
             return bad("알 수 없는 시나리오")
         return jsonify(s.state())
 
+    @bp.route("/api/adc/scan", methods=["POST"])
+    def scan():
+        try:
+            s.load_scan(str(body().get("id", "")))
+        except KeyError:
+            return bad("맵이 합성된 스캔을 찾을 수 없습니다")
+        except ValueError as e:
+            return bad(f"검출 실패: {e}")
+        return jsonify(s.state())
+
     @bp.route("/api/adc/die", methods=["POST"])
     def die():
         d = body()

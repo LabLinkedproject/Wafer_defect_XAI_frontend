@@ -34,6 +34,16 @@ const WaferView = (() => {
         lines += `<path d="M${a}L${b}M${c}L${d}"/>`;
       }
     }
+    // 검출 표시: marks = [{x_mm, y_mm, r_mm, color, title}] (웨이퍼 중심 기준 mm, 위쪽 +)
+    let marks = "";
+    if (opts.marks && geo.pitch) {
+      const mm = geo.pitch / (opts.pitchMm || 32);
+      for (const k of opts.marks) {
+        const [x, y] = toPx(geo, k.x_mm / (opts.pitchMm || 32), -k.y_mm / (opts.pitchMm || 32));
+        const r = Math.max(k.r_mm * mm, geo.r / 45);
+        marks += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${k.color}" stroke-width="${sw * 2.6}"><title>${k.title || ""}</title></circle>`;
+      }
+    }
     const id = `wv${Math.random().toString(36).slice(2, 8)}`;
     host.classList.add("wafer-view");
     host.innerHTML = `<svg viewBox="${vb}" role="img" aria-label="합성 웨이퍼 맵">
@@ -43,6 +53,7 @@ const WaferView = (() => {
       <image href="${m.url}" x="0" y="0" width="${W}" height="${H}" clip-path="url(#${id})"/>
       <g clip-path="url(#${id})" stroke="#4da3ff" stroke-opacity=".5" stroke-width="${sw}" fill="none">${lines}</g>
       <circle cx="${geo.cx}" cy="${geo.cy}" r="${geo.r}" fill="none" stroke="#fff" stroke-width="${sw * 1.6}"/>
+      <g>${marks}</g>
     </svg>`;
   }
 
