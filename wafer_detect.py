@@ -34,7 +34,25 @@ SCRATCH_ELONGATION = 3.5
 SCRATCH_MIN_MM = 4.0
 HEAVY_QUADRAT_AREA = 0.05     # 구역 면적 중 이 비율 이상이면 heavy
 HEAVY_QUADRAT_COUNT = 3
+LINE_GUARD_MM = 5.0           # 다이 경계선에서 이 거리 안의 가는 성분은 격자선 잔차
+LINE_RESIDUAL_ELONGATION = 3.0
+OUTLIER_RATIO = 0.25          # 국소 배경에서 이만큼 벗어난 픽셀은 배경 평균에서 뺀다
+MAX_DARK_DEFECT_MM = 12        # 이보다 작은 어두운 구멍은 미촬영이 아니라 검은 결함
 BACKGROUND_MAX = 26           # 합성 맵의 미촬영 영역 밝기 (18~20)
+
+
+def _seen(gray: np.ndarray, pitch_px: float) -> np.ndarray:
+    """촬영된 영역. 맵의 미촬영 부분은 어둡게 칠해지지만 검은 결함도 그만큼 어둡다.
+    촬영 영역 안에 갇힌 작은 어두운 구멍은 결함으로 보고 촬영된 것으로 친다."""
+    seen = gray > BACKGROUND_MAX
+    n, lab, stats, _ = cv2.connectedComponentsWithStats((~seen).astype(np.uint8), connectivity=8)
+    h, w = gray.shape
+    limit = (MAX_DARK_DEFECT_MM * pitch_px / WAFER_MODEL["pitch_mm"]) ** 2
+    for i in range(1, n):
+        x, y, bw, bh, area = stats[i]
+        if area <= limit and x > 0 and y > 0 and x + bw < w and y + bh < h:
+            seen[lab == i] = True
+    return seen
 
 
 def rectify(gray: np.ndarray, meta: dict) -> tuple[np.ndarray, np.ndarray, int]:
@@ -50,7 +68,7 @@ def rectify(gray: np.ndarray, meta: dict) -> tuple[np.ndarray, np.ndarray, int]:
     M = np.array([[c, s, cx - h * (c + s)], [-s, c, cy - h * (c - s)]], np.float32)
     flags = cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP
     img = cv2.warpAffine(gray.astype(np.float32), M, (side, side), flags=flags)
-    seen = cv2.warpAffine((gray > BACKGROUND_MAX).astype(np.float32), M, (side, side), flags=flags) > 0.99
+    seen = cv2.warpAffine(_seen(gray, pitch).astype(np.float32), M, (side, side), flags=flags) > 0.99
     yy, xx = np.mgrid[0:side, 0:side].astype(np.float32)
     disc = np.hypot(xx - h + 0.5, yy - h + 0.5) < meta["wafer"]["radius_px"] / k * 0.985
     valid = cv2.erode((seen & disc).astype(np.uint8), np.ones((15, 15), np.uint8)) > 0   # 촬영 경계는 합성 잔차가 크다
@@ -70,7 +88,13 @@ def crop_dies(img, valid, P, dies):
 
 
 def _flatten(a: np.ndarray, sigma: float) -> np.ndarray:
-    return a / np.maximum(cv2.GaussianBlur(a, (0, 0), sigma), 1.0)
+    """국소 배경으로 나눈다. 아주 어두운 결함이 배경 평균을 끌어내려 주변에 가짜 테두리가 생기지 않도록
+    배경에서 크게 벗어난 픽셀을 빼고 다시 평균한다."""
+    base = cv2.GaussianBlur(a, (0, 0), sigma)
+    keep = (np.abs(a - base) < OUTLIER_RATIO * np.maximum(base, 1.0)).astype(np.float32)
+    w = cv2.GaussianBlur(keep, (0, 0), sigma)
+    base = np.where(w > 0.05, cv2.GaussianBlur(a * keep, (0, 0), sigma) / np.maximum(w, 1e-6), base)
+    return a / np.maximum(base, 1.0)
 
 
 def align(crops: dict, P: int):
@@ -116,6 +140,16 @@ def _components(mask: np.ndarray, min_area: int):
     return [(lab == i, stats[i, cv2.CC_STAT_AREA]) for i in range(1, n) if stats[i, cv2.CC_STAT_AREA] >= min_area]
 
 
+def _grid_residual(xs, ys, w, h, area_mm2, P, mm) -> bool:
+    """다이 경계선 옆 띠 안에 갇힌 길쭉한 성분은 격자선 위치 차이가 남은 것으로 본다.
+    격자선이 다이마다 조금씩 어긋나 있으면 기준 다이와 비교할 때 선이 결함처럼 남는다."""
+    guard = LINE_GUARD_MM / mm
+    near_x = min(xs.min(), P - 1 - xs.max()) < guard and np.ptp(xs) < guard     # 세로 경계선 옆
+    near_y = min(ys.min(), P - 1 - ys.max()) < guard and np.ptp(ys) < guard     # 가로 경계선 옆
+    along = max(w, h) >= LINE_RESIDUAL_ELONGATION * max(min(w, h), 1.0)     # 경계선 방향으로 길쭉함
+    return (near_x or near_y) and (along or area_mm2 < 1.0)
+
+
 def extract(crops: dict, P: int, noise: dict) -> list[dict]:
     """z 지도에서 결함 덩어리를 뽑아 유형과 웨이퍼 좌표를 붙인다."""
     mm = WAFER_MODEL["pitch_mm"] / P
@@ -126,13 +160,17 @@ def extract(crops: dict, P: int, noise: dict) -> list[dict]:
         soft = (np.abs(c["soft"]) > max(STAIN_Z * noise["soft_sigma"], MIN_STAIN_CONTRAST)) & c["mask"]
         stain_min = int(MIN_STAIN_RATIO * P * P)
         c["pixels"] = np.zeros((P, P), bool)
-        for region, kind_min, is_stain in ((sharp, MIN_SHARP_AREA, False), (soft & ~sharp, stain_min, True)):
+        # 번짐 지도는 흐림을 거치므로 선명한 결함 둘레에도 반응한다. 그 둘레는 번짐 결함에서 뺀다
+        halo = cv2.dilate(sharp.astype(np.uint8), np.ones((2 * (P // 14) + 1,) * 2, np.uint8)) > 0
+        for region, kind_min, is_stain in ((sharp, MIN_SHARP_AREA, False), (soft & ~halo, stain_min, True)):
             for comp, area in _components(region, kind_min):
                 ys, xs = np.where(comp)
                 pts = np.column_stack([xs, ys]).astype(np.float32)
                 (_, _), (w, h), _ = cv2.minAreaRect(pts)
                 long_mm, short = max(w, h) * mm, max(min(w, h), 1.0)
                 elong = max(w, h) / short
+                if not is_stain and _grid_residual(xs, ys, w, h, area * mm * mm, P, mm):
+                    continue
                 kind = "stain" if is_stain else ("scratch" if elong >= SCRATCH_ELONGATION and long_mm >= SCRATCH_MIN_MM else "particle")
                 x_mm = (c["x"] + xs.mean() - R.GRID_DIES / 2 * P) * mm
                 y_mm = (R.GRID_DIES / 2 * P - c["y"] - ys.mean()) * mm
