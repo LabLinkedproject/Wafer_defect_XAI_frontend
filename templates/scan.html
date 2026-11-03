@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>웨이퍼 스캔 콘솔</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/scan.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/scan_progress.css') }}">
 </head>
 <body>
 
@@ -54,8 +55,11 @@
         <button class="btn primary big" id="btnScan">▶ 웨이퍼 스캔 시작</button>
         <button class="btn danger big" id="btnStop">■ 정지</button>
       </div>
-      <div class="progress"><div class="bar" id="bar"></div></div>
-      <div class="job-line"><span id="jobMsg">대기 중</span><span class="num" id="jobCount"></span></div>
+      <div id="jobPlain">
+        <div class="progress"><div class="bar" id="bar"></div></div>
+        <div class="job-line"><span id="jobMsg">대기 중</span><span class="num" id="jobCount"></span></div>
+      </div>
+      <div id="flow"></div>
       <p class="hint">웨이퍼 중심 → 44개 다이를 지그재그로 돌며 정지·촬영 → 웨이퍼 중심 복귀</p>
     </div>
 
@@ -135,6 +139,7 @@
 </main>
 
 <script src="{{ url_for('static', filename='js/wafer_view.js') }}"></script>
+<script src="{{ url_for('static', filename='js/scan_progress.js') }}"></script>
 <script src="{{ url_for('static', filename='js/scan.js') }}"></script>
 </body>
 </html>

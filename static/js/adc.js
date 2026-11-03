@@ -538,36 +538,44 @@
 
   // ── 새 스캔 감시 ─────────────────────────────────────────────
   // 스캔은 촬영 뒤 맵 합성·검출까지 1분 남짓 더 걸린다. 진행을 알리고, 끝나면 새 결과를 불러온다.
-  let scanNote = "";
   let newest = null;          // 이 화면이 이미 알고 있는 가장 새 맵
+  let shownUntil = 0;         // 완료 표시를 잠시 남겨 둘 시각
   async function watchScan() {
     if (!S) return;
     try {
       const st = await (await fetch("/api/scan/status", { cache: "no-store" })).json();
       const j = st.job, m = st.wafer_map;
       newest ??= S.scans[0]?.id ?? null;
-      let note = "";
-      if (j.busy && j.name === "scan") {
-        note = (j.progress < j.total ? `스캔 진행 중 ${j.progress}/${j.total}장` : "촬영 완료 · 웨이퍼 맵 합성과 결함 검출 중") +
-          ". 끝나면 새 결과를 자동으로 불러옵니다.";
-      } else if (m?.wafer && m.dir !== newest && m.dir > (newest || "")) {
+      let loaded = false;
+      if (!j.busy && m?.wafer && m.dir !== newest && m.dir > (newest || "")) {
         newest = m.dir;
         if (S.session.source === "scan" && !S.session.edited && !S.belief.answered.length) {
           selected = null;
           await act("/api/adc/scan", { id: m.dir });
+          loaded = true;
+          shownUntil = Date.now() + 15000;
         }
       }
-      if (!note && newest && S.session.scan_id !== newest && S.session.source === "scan") {
-        note = "더 새 스캔이 있습니다. 위 입력 선택에서 고르면 불러옵니다.";
+      const recent = j.finished && Date.now() - new Date(j.finished).getTime() < 120000;   // 끝난 지 2분 이내
+      const flowJob = j.phases?.length && (j.busy || Date.now() < shownUntil || (recent && j.result && j.result !== S.session.scan_id));
+      let html = "";
+      if (flowJob) {
+        const pending = !j.busy && j.result && j.result !== S.session.scan_id;
+        html = ScanProgress.html(j, { resultHref: pending ? `/analysis?scan=${encodeURIComponent(j.result)}` : null });
+        if (!j.busy && !pending) html = html.replace("결과 준비 완료", "결과 준비 완료 · 화면을 새 스캔으로 바꿨습니다");
       }
-      if (note !== scanNote) {
-        scanNote = note;
-        $("scan-note").textContent = note;
-        $("scan-note").hidden = !note;
-      }
-    } catch (e) { /* 스캔 콘솔이 없어도 대시보드는 동작한다 */ }
+      const box = $("scan-flow");
+      if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+      box.hidden = !html;
+      clearTimeout(watchTimer);
+      watchTimer = setTimeout(watchScan, j.busy || loaded ? 1000 : 3000);
+    } catch (e) {
+      clearTimeout(watchTimer);
+      watchTimer = setTimeout(watchScan, 3000);   // 스캔 콘솔이 없어도 대시보드는 동작한다
+    }
   }
-  setInterval(watchScan, 3000);
+  let watchTimer = null;
+  watchTimer = setTimeout(watchScan, 1000);
 
   (async () => {
     try {

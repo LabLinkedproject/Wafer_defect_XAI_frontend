@@ -103,7 +103,7 @@ class ScanService:
             "calibrated": None if st is None else {a: bool(st.get(f"calibrated_{a}")) for a in "xy"},
             "limits": {"x": [xl, xh], "y": [yl, yh]},
             "config": cfg,
-            "job": dict(self.job),
+            "job": self._job_view(),
             "scan": {"dir": self.scan["dir"], "count": len(self.scan["results"]),
                      "results": self.scan["results"], "preview": self.scan["preview"]},
             "wafer_map": self.latest_map(),
@@ -175,7 +175,8 @@ class ScanService:
             st = self._state() if motion else None
             self._stop = False
             self.job.update(name=name, busy=True, message="시작", error=None, progress=0, total=total,
-                            started=datetime.now().isoformat(timespec="seconds"), finished=None)
+                            started=datetime.now().isoformat(timespec="seconds"), finished=None,
+                            phases=[], result=None)
 
         def worker():
             try:
@@ -195,10 +196,69 @@ class ScanService:
                 if self._g is not None:
                     self._g.close()
                 self._g = None
+                for ph in self.job.get("phases", []):
+                    if ph["started"] and not ph["finished"]:
+                        ph["finished"] = time.time()
+                        ph["failed"] = bool(self.job["error"] or self._stop)
                 self.job.update(busy=False, finished=datetime.now().isoformat(timespec="seconds"))
 
         self._thread = threading.Thread(target=worker, daemon=True, name=f"job-{name}")
         self._thread.start()
+
+    # ── 진행 단계 ─────────────────────────────────────────────────
+    # 스캔은 촬영 뒤에도 맵 합성·검출에 1분 남짓 걸린다. 단계와 남은 시간을 화면에 알리기 위해 기록한다.
+    def _expected(self) -> dict:
+        """직전 스캔에서 잰 단계별 소요 시간 (초). 기록이 없으면 대략값."""
+        out = {"capture": 65.0, "stitch": 70.0, "detect": 3.0}
+        for d in self._full_scans():
+            try:
+                with open(os.path.join(d, "manifest.json")) as f:
+                    man = json.load(f)
+                if man.get("finished") and not man.get("stopped"):
+                    t = datetime.fromisoformat(man["finished"]) - datetime.fromisoformat(man["started"])
+                    out["capture"] = max(10.0, t.total_seconds())
+                with open(os.path.join(d, "wafer_map.json")) as f:
+                    out["stitch"] = float(json.load(f)["seconds"])
+                break
+            except (OSError, ValueError, KeyError):
+                continue
+        return out
+
+    def _plan_phases(self, keys):
+        names = {"capture": "촬영", "stitch": "웨이퍼 맵 합성", "detect": "결함 검출"}
+        exp = self._expected()
+        self.job["phases"] = [{"key": k, "name": names[k], "expected_s": round(exp[k], 1),
+                               "started": None, "finished": None, "failed": False} for k in keys]
+
+    def _phase(self, key):
+        now = time.time()
+        for ph in self.job.get("phases", []):
+            if ph["started"] and not ph["finished"] and ph["key"] != key:
+                ph["finished"] = now
+            if ph["key"] == key:
+                ph["started"], ph["finished"] = now, None
+
+    def _job_view(self) -> dict:
+        """화면용 작업 상태: 단계별 진행과 남은 시간 예측을 붙인다."""
+        j = {k: v for k, v in self.job.items() if k != "phases"}
+        now, eta, rows = time.time(), 0.0, []
+        for ph in self.job.get("phases", []):
+            if ph["finished"]:
+                state, took, left = ("failed" if ph["failed"] else "done"), ph["finished"] - ph["started"], 0.0
+            elif ph["started"]:
+                state, took = "active", now - ph["started"]
+                if ph["key"] == "capture" and self.job["progress"] >= 2:
+                    left = (self.job["total"] - self.job["progress"]) * took / self.job["progress"] + 3
+                else:
+                    left = max(ph["expected_s"] - took, 3.0)      # 예상보다 길어지면 '곧'으로 보이게 짧게 둔다
+            else:
+                state, took, left = "wait", 0.0, ph["expected_s"]
+            eta += left
+            rows.append({"key": ph["key"], "name": ph["name"], "state": state, "took_s": round(took, 1),
+                         "expected_s": ph["expected_s"]})
+        j["phases"] = rows
+        j["eta_s"] = round(eta) if self.job["busy"] and rows else None
+        return j
 
     def stop(self):
         self._stop = True
@@ -302,6 +362,8 @@ class ScanService:
         order = plan["order"]
 
         def fn(g, st, cfg):
+            self._plan_phases(["capture", "stitch", "detect"])
+            self._phase("capture")
             prof = self._profile(st, cfg)
             out = self._new_dir("scan")
             self.scan.update(dir=out, results=[], preview=[])
@@ -343,7 +405,8 @@ class ScanService:
             self._move(g, st, prof, float(cfg["wafer_center_x"]), float(cfg["wafer_center_y"]))
             scan_s = time.monotonic() - t0
             self._make_map(out, len(self.scan["results"]))
-            self.job["message"] = f"스캔 완료: {len(self.scan['results'])}/{len(order)}장, {scan_s:.0f}초. 웨이퍼 맵 합성 완료"
+            self.job["result"] = os.path.basename(out.rstrip("/"))
+            self.job["message"] = f"스캔 완료: {len(self.scan['results'])}/{len(order)}장, {scan_s:.0f}초. 웨이퍼 맵 합성·결함 검출 완료"
         self._run("scan", fn, total=len(order))
 
     # ── 웨이퍼 맵 ──────────────────────────────────────────────────
@@ -352,7 +415,9 @@ class ScanService:
             self.job["message"] = f"웨이퍼 맵: {msg}"
         if n < wafer_stitch.MIN_IMAGES:
             raise JobError(f"합성에 필요한 사진이 부족합니다 ({n}장)")
+        self._phase("stitch")
         wafer_stitch.build(scan_dir, log=log)
+        self._phase("detect")
         log("결함 검출")
         try:
             scan_input.detect(os.path.basename(scan_dir.rstrip("/")))   # 분석 화면이 바로 쓰도록 미리 계산
@@ -382,8 +447,10 @@ class ScanService:
             raise JobError("합성할 스캔이 없습니다. 먼저 스캔을 실행하세요.")
 
         def fn(g, st, cfg):
+            self._plan_phases(["stitch", "detect"])
             self._make_map(scans[0], 99)
-            self.job["message"] = "웨이퍼 맵 합성 완료"
+            self.job["result"] = os.path.basename(scans[0].rstrip("/"))
+            self.job["message"] = "웨이퍼 맵 합성·결함 검출 완료"
         self._run("map", fn, motion=False)
 
     def apply_alignment(self) -> dict:

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>웨이퍼 결함 분석 대시보드</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/adc.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/scan_progress.css') }}">
 </head>
 <body>
   <header class="appbar">
@@ -35,7 +36,7 @@
   </nav>
 
   <div class="simbar" id="simbar" role="status"></div>
-  <div class="simbar live" id="scan-note" role="status" hidden></div>
+  <div class="scan-flow" id="scan-flow" hidden></div>
   <div class="errbar" id="errbar" role="alert" hidden></div>
 
   <!-- 판정 요약 -->
@@ -245,6 +246,7 @@
   </main>
 
   <script src="{{ url_for('static', filename='js/wafer_view.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/scan_progress.js') }}"></script>
   <script src="{{ url_for('static', filename='js/adc.js') }}"></script>
 </body>
 </html>

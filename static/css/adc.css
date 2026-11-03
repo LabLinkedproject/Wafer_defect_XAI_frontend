@@ -70,6 +70,8 @@ button, select, textarea, input { font: inherit; color: inherit; }
 .pipeline small { display: block; color: var(--muted); font-weight: 400; font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .simbar { padding: 7px 24px; background: #fff7e3; border-bottom: 1px solid #efdca9; color: #6d4d00; font-size: 0.82rem; }
+.scan-flow { padding: 0 24px; }
+.scan-flow .sp { margin: 10px 0 0; }
 .simbar.live { background: #e8f4ee; border-bottom-color: #b9dcc8; color: #1d5a3a; }
 .errbar { padding: 8px 24px; background: #fdecea; color: var(--bad); font-size: 0.86rem; }
 

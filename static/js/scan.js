@@ -136,6 +136,10 @@
     $("bar").style.width = `${pct}%`;
     $("jobMsg").textContent = j.message || "";
     $("jobCount").textContent = j.total ? `${j.progress}/${j.total}` : "";
+    // 스캔·맵 합성은 단계와 남은 시간으로 보여 준다
+    const flow = j.phases?.length ? ScanProgress.html(j, { resultHref: j.result ? `/analysis?scan=${encodeURIComponent(j.result)}` : null }) : "";
+    $("jobPlain").hidden = !!flow;
+    if ($("flow").dataset.html !== flow) { $("flow").innerHTML = flow; $("flow").dataset.html = flow; }
 
     const ready = s.gpio_access && s.origin_set && !busy;
     for (const id of ["btnScan", "btnBounds", "btnOrigin", "btnWaferCenter", "btnSetCenter", "btnSave"]) {
