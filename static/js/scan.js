@@ -273,7 +273,8 @@
     try {
       const r = (await api("/api/scan/light", {})).result;
       out.className = `light-result ${r.verdict}`;
-      out.textContent = `${r.advice}  ·  촬영 노출 ${r.exposure} · 사진 밝기 ${r.level} (목표 ${r.target}) · 포화 반사 ${r.saturated_pct}%`;
+      out.textContent = `${r.advice}  ·  촬영 노출 ${r.exposure} · 사진 밝기 ${r.level} (목표 ${r.target}) · 포화 반사 ${r.saturated_pct}%` +
+        `\n${r.geometry || ""}  ·  격자 한 칸 ${r.pitch_px ?? "-"} px · 선명도 ${r.sharpness}`;
     } catch (e) {
       out.textContent = "점검하지 못했습니다.";
     } finally {

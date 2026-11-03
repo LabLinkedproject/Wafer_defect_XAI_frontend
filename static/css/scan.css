@@ -156,7 +156,7 @@ button, select, input { font: inherit; }
 }
 .die.done .id { color: #fff; text-shadow: 0 0 3px #000; }
 
-.light-result { margin: 10px 0 0; padding: 9px 11px; border-radius: 8px; background: #f2f4f7; font-size: 0.86rem; }
+.light-result { white-space: pre-line; margin: 10px 0 0; padding: 9px 11px; border-radius: 8px; background: #f2f4f7; font-size: 0.86rem; }
 .light-result.dark { background: #fdecea; color: #8a2a1d; }
 .light-result.low { background: #fff6e0; color: #6d4d00; }
 .light-result.ok { background: #e8f4ee; color: #1d5a3a; }

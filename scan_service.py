@@ -452,8 +452,11 @@ class ScanService:
             raise JobError(f"합성에 필요한 사진이 부족합니다 ({n}장)")
         # 맵 방향은 하드웨어(갠트리 축과 웨이퍼의 관계)로 정해지므로 지금 설정을 따른다 (예전 스캔을 다시 합성할 때도)
         cmd = [sys.executable, os.path.join(BASE_DIR, "map_job.py"), os.path.abspath(scan_dir)]
-        if int(scan_config.load()["wafer_sign_y"]) < 0:
+        cfg = scan_config.load()
+        if int(cfg["wafer_sign_y"]) < 0:
             cmd.append("--flip-y")
+        if cfg.get("camera_scale_hint"):
+            cmd.append(f"--scale-hint={float(cfg['camera_scale_hint']):.4f}")
         self._phase("stitch")
         proc = subprocess.Popen(cmd, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         error, tail = None, []
@@ -518,6 +521,7 @@ class ScanService:
         g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         level = float(np.median(cv2.resize(g, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)))
         sat = float((g >= 245).mean() * 100)
+        geo = self._camera_geometry(g, cfg)
         if e >= LIGHT_CAP_EXPOSURE and level < AE_TARGET - AE_TOLERANCE:
             verdict, advice = "dark", f"조명이 부족합니다. 지금보다 {AE_TARGET / max(level, 1):.1f}배 이상 밝게 한 뒤 다시 점검하세요."
         elif e >= LIGHT_CAP_EXPOSURE:
@@ -525,7 +529,63 @@ class ScanService:
         else:
             verdict, advice = "ok", "알맞습니다. 이 조명으로 스캔하세요."
         return {"exposure": e, "level": round(level), "target": AE_TARGET, "saturated_pct": round(sat, 1),
-                "verdict": verdict, "advice": advice}
+                "verdict": verdict, "advice": advice, **geo}
+
+    @staticmethod
+    def _frame_pitch(g: np.ndarray) -> float | None:
+        """사진 한 장의 격자 한 칸 간격(px). 가운데는 조명 반사, 가장자리는 어안 왜곡이 커서
+        가운데 위·아래 띠와 좌·우 띠에서 선 간격을 재 평균한다. 높이 변화 전후를 비교하는 용도다."""
+        g = g.astype(np.float32)
+        h, w = g.shape
+        g[g > 230] = float(np.median(g))
+        def spacing(profile):
+            p = cv2.GaussianBlur(profile.reshape(1, -1), (0, 0), 3).ravel()
+            p = p - cv2.GaussianBlur(p.reshape(1, -1), (0, 0), 30).ravel()
+            th = np.percentile(p, 97)
+            peaks = [i for i in range(4, len(p) - 4) if p[i] > th and p[i] == p[i - 4:i + 5].max()]
+            gaps = np.diff(peaks)
+            gaps = gaps[gaps > 80]
+            return float(np.median(gaps)) if len(gaps) else None
+        vals = [spacing(g[y0:y0 + 120, w // 2 - 660:w // 2 + 660].mean(0)) for y0 in (int(h * 0.15), int(h * 0.75))]
+        vals += [spacing(g[h // 2 - 400:h // 2 + 400, x0:x0 + 120].mean(1)) for x0 in (int(w * 0.18), int(w * 0.75))]
+        vals = [v for v in vals if v]
+        return float(np.mean(vals)) if vals else None
+
+    def _camera_geometry(self, g: np.ndarray, cfg: dict) -> dict:
+        """카메라 높이 점검: 격자 간격과 선명도를 처음 잰 값(기준)과 비교해 새 축척을 계산하고 맵 합성 기준으로 저장한다."""
+        pitch = self._frame_pitch(g)
+        sharp = float(cv2.Laplacian(cv2.GaussianBlur(g.astype(np.float32), (0, 0), 1), cv2.CV_32F).var())
+        out = {"pitch_px": round(pitch, 1) if pitch else None, "sharpness": round(sharp, 1)}
+        if not pitch:
+            out["geometry"] = "사진에서 격자선을 찾지 못해 높이를 재지 못했습니다."
+            return out
+        ref_pitch, ref_scale = cfg.get("camera_ref_pitch_px"), cfg.get("camera_ref_scale")
+        if not ref_pitch or not ref_scale:
+            m = wafer_stitch.latest_map(SCAN_ROOT)
+            if not (m and m.get("camera")):
+                out["geometry"] = "기준으로 삼을 맵이 없습니다. 스캔을 한 번 한 뒤 다시 점검하세요."
+                return out
+            scan_config.update(camera_ref_pitch_px=round(pitch, 1), camera_ref_scale=m["camera"]["px_per_mm_full"],
+                               camera_ref_sharpness=round(sharp, 1), camera_scale_hint=None)
+            out["geometry"] = f"지금 카메라 높이를 기준으로 저장했습니다 (격자 한 칸 {pitch:.0f} px)."
+            return out
+        ratio = pitch / float(ref_pitch)
+        if abs(ratio - 1) < 0.03:
+            scan_config.update(camera_scale_hint=None)
+            out["geometry"] = "카메라 높이가 기준과 같습니다."
+        else:
+            hint = float(ref_scale) * ratio
+            scan_config.update(camera_scale_hint=round(hint, 3))
+            out["geometry"] = (f"카메라가 기준보다 {'가까워져' if ratio > 1 else '멀어져'} 영상이 {ratio:.2f}배입니다. "
+                               f"맵 합성 축척을 {hint:.2f} px/mm 로 맞췄습니다.")
+            fov_short = 1080 / hint
+            if fov_short < 60:
+                out["geometry"] += f" 시야가 짧은 쪽 {fov_short:.0f} mm 로 좁아 스캔 사진끼리 겹침이 부족할 수 있습니다."
+        ref_sharp = cfg.get("camera_ref_sharpness")
+        if ref_sharp and sharp < 0.7 * float(ref_sharp):
+            out["geometry"] += " 사진이 기준보다 흐립니다. 고정 초점 렌즈라 초점이 맞는 높이로 조정하세요."
+        out["ratio"] = round(ratio, 3)
+        return out
 
     def apply_alignment(self) -> dict:
         """맵에서 측정한 웨이퍼 중심·반지름을 스캔 설정에 적용한다. 다음 스캔은 웨이퍼 전체를 덮는다."""

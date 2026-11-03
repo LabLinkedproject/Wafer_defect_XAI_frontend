@@ -29,6 +29,12 @@ DEFAULTS = {
     "scan_exposure": 25,
     # 스캔 시작 때 웨이퍼 중심에서 몇 장 찍어 촬영 노출을 맞춘다 (scan_exposure 는 시작값). 조명을 바꿔도 따라간다
     "auto_exposure": True,
+    # 카메라 높이 기준: 촬영 환경 점검이 처음 잰 사진 속 격자 한 칸(px)과 그때의 카메라 축척(px/갠트리 mm).
+    # 높이를 바꾸면 격자 간격 비율로 새 축척(camera_scale_hint)을 계산해 맵 합성 기준으로 쓴다
+    "camera_ref_pitch_px": None,
+    "camera_ref_scale": None,
+    "camera_ref_sharpness": None,
+    "camera_scale_hint": None,
     "jpeg_quality": 92,
 }
 

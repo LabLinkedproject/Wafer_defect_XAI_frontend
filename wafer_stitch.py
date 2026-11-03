@@ -131,9 +131,11 @@ def _camera_matrix(scale: float, theta_deg: float, mirrored: bool) -> np.ndarray
     return scale * np.array([[math.cos(t), -sign * math.sin(t)], [math.sin(t), sign * math.cos(t)]])
 
 
-def camera_prior(scan_root: str, exclude: str, recent: int = 5) -> np.ndarray | None:
+def camera_prior(scan_root: str, exclude: str, recent: int = 5, scale_hint: float | None = None) -> np.ndarray | None:
     """최근 합성에 성공한 다른 스캔들의 카메라 행렬 (축소 영상 기준). 카메라 장착이 같다고 본다.
-    한 번 잘못 잰 맵이 다음 기준을 오염시키지 않도록 최근 몇 개의 중앙값을 쓴다."""
+    한 번 잘못 잰 맵이 다음 기준을 오염시키지 않도록 최근 몇 개의 중앙값을 쓴다.
+    scale_hint: 카메라 높이를 바꾼 뒤 촬영 환경 점검이 잰 새 축척(px/갠트리 mm). 있으면 축척은 이것을 쓰고
+    회전·좌우는 그대로 이전 값을 쓴다 (높이만 바뀌었다고 본다)."""
     scales, turns, mirrored = [], [], []
     for d in sorted(glob.glob(os.path.join(scan_root, "*_scan")), reverse=True):
         meta = os.path.join(d, "wafer_map.json")
@@ -149,8 +151,8 @@ def camera_prior(scan_root: str, exclude: str, recent: int = 5) -> np.ndarray | 
             break
     if not scales:
         return None
-    return _camera_matrix(float(np.median(scales)) * WORK_SCALE, float(np.median(turns)),
-                          sum(mirrored) * 2 > len(mirrored))
+    scale = float(scale_hint) if scale_hint else float(np.median(scales))
+    return _camera_matrix(scale * WORK_SCALE, float(np.median(turns)), sum(mirrored) * 2 > len(mirrored))
 
 
 def _agrees(cam: dict, prior: np.ndarray) -> bool:
@@ -466,7 +468,8 @@ def measure_grid(mos: np.ndarray, den: np.ndarray, wafer: dict | None, s: float 
             "pitch_x_px": out.get("x"), "pitch_y_px": out.get("y")}
 
 
-def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log=print, flip_y: bool | None = None) -> dict:
+def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log=print, flip_y: bool | None = None,
+          scale_hint: float | None = None) -> dict:
     """스캔 폴더(manifest.json + 사진)로 웨이퍼 맵을 만든다.
     flip_y: 갠트리 +Y 가 웨이퍼 6시(노치) 쪽이면 참. 맵을 위아래로 뒤집어 노치가 아래, 다이 1 이 위에 오게 한다.
     없으면 스캔 당시 설정(wafer_sign_y)을 따른다."""
@@ -498,7 +501,7 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
     log("카메라 축척·방향 측정")
     pairs = [(i, rc[(r + dr, c + dc)]) for (r, c), i in rc.items() for dr, dc in ((0, 1), (1, 0))
              if (r + dr, c + dc) in rc]
-    prior = camera_prior(root, scan_dir)
+    prior = camera_prior(root, scan_dir, scale_hint=scale_hint)
     try:
         cam = estimate_camera(flat, pos, pairs)
     except ValueError:
