@@ -40,9 +40,11 @@ def _edges(img: np.ndarray, win: np.ndarray) -> np.ndarray:
     return np.hypot(cv2.Sobel(a, cv2.CV_32F, 1, 0), cv2.Sobel(a, cv2.CV_32F, 0, 1)) * win
 
 
-def estimate_camera(flat: list[np.ndarray], pos: np.ndarray, grid: list[tuple]) -> dict:
+def estimate_camera(flat: list[np.ndarray], pos: np.ndarray, grid: list[tuple], prior: np.ndarray | None = None) -> dict:
     """이웃 사진 쌍의 영상 이동으로 mm→px 행렬을 구한다.
-    다이 격자가 반복되므로 한 칸 어긋난 쌍이 섞인다. 큰 이동을 일관되게 내는 쌍만 쓴다."""
+    다이 격자가 반복되므로 한 칸 어긋난 쌍이 섞인다. 큰 이동을 일관되게 내는 쌍만 쓴다.
+    prior(이전 스캔의 행렬)를 주면 예상 이동만큼 먼저 옮긴 뒤 남은 차이만 잰다.
+    스캔 간격과 격자 피치가 같고 반사 무늬가 없는 면에서는 이렇게 해야 한 칸 이동을 0 으로 읽지 않는다."""
     h, w = flat[0].shape
     yy, xx = np.mgrid[0:h, 0:w]
     win = cv2.GaussianBlur((np.hypot(xx - w / 2, yy - h / 2) < h * 0.46).astype(np.float32), (0, 0), 15)
@@ -51,7 +53,13 @@ def estimate_camera(flat: list[np.ndarray], pos: np.ndarray, grid: list[tuple]) 
     samples = []
     for i, j in grid:
         d = pos[j] - pos[i]
-        (sx, sy), resp = cv2.phaseCorrelate(edges[i], edges[j], hann)
+        if prior is None:
+            (sx, sy), resp = cv2.phaseCorrelate(edges[i], edges[j], hann)
+        else:
+            ex, ey = prior @ d
+            back = cv2.warpAffine(edges[j], np.float64([[1, 0, -ex], [0, 1, -ey]]), (w, h))
+            (rx, ry), resp = cv2.phaseCorrelate(edges[i], back, hann)
+            sx, sy = ex + rx, ey + ry
         samples.append((d[0], d[1], sx, sy, resp))
     s = np.array(samples)
     if len(s) < 4:
@@ -78,6 +86,34 @@ def estimate_camera(flat: list[np.ndarray], pos: np.ndarray, grid: list[tuple]) 
     A = scale * np.array([[math.cos(theta), -sign * math.sin(theta)],
                           [math.sin(theta), sign * math.cos(theta)]])
     return {"A": A, "scale": float(scale), "theta_deg": math.degrees(theta), "mirrored": sign < 0}
+
+
+def _camera_matrix(scale: float, theta_deg: float, mirrored: bool) -> np.ndarray:
+    t, sign = math.radians(theta_deg), -1.0 if mirrored else 1.0
+    return scale * np.array([[math.cos(t), -sign * math.sin(t)], [math.sin(t), sign * math.cos(t)]])
+
+
+def camera_prior(scan_root: str, exclude: str) -> np.ndarray | None:
+    """가장 최근에 합성에 성공한 다른 스캔의 카메라 행렬 (축소 영상 기준). 카메라 장착이 같다고 본다."""
+    for d in sorted(glob.glob(os.path.join(scan_root, "*_scan")), reverse=True):
+        meta = os.path.join(d, "wafer_map.json")
+        if os.path.abspath(d) == os.path.abspath(exclude) or not os.path.isfile(meta):
+            continue
+        with open(meta) as f:
+            cam = json.load(f).get("camera")
+        if cam:
+            return _camera_matrix(cam["px_per_mm_full"] * WORK_SCALE, cam["rotation_deg"], cam["mirrored"])
+    return None
+
+
+def _agrees(cam: dict, prior: np.ndarray) -> bool:
+    """직접 측정이 이전 카메라와 축척 20 %, 회전 10° 안에서 맞는지"""
+    if not np.isfinite(cam["A"]).all():
+        return False
+    p_scale = float(np.linalg.norm(prior[:, 0]))
+    p_theta = math.degrees(math.atan2(prior[1, 0], prior[0, 0]))
+    turn = abs((cam["theta_deg"] - p_theta + 180) % 360 - 180)
+    return abs(cam["scale"] / p_scale - 1) < 0.2 and turn < 10
 
 
 def _distort(x, y, q):
@@ -392,7 +428,18 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
     log("카메라 축척·방향 측정")
     pairs = [(i, rc[(r + dr, c + dc)]) for (r, c), i in rc.items() for dr, dc in ((0, 1), (1, 0))
              if (r + dr, c + dc) in rc]
-    cam = estimate_camera(flat, pos, pairs)
+    prior = camera_prior(root, scan_dir)
+    try:
+        cam = estimate_camera(flat, pos, pairs)
+    except ValueError:
+        if prior is None:
+            raise
+        cam = {"A": np.full((2, 2), np.nan)}
+    if prior is not None and not _agrees(cam, prior):
+        log("격자 반복으로 이동량이 모호해 이전 카메라 값을 기준으로 다시 측정")
+        cam = estimate_camera(flat, pos, pairs, prior)
+    if not np.isfinite(cam["A"]).all():
+        raise ValueError("사진 사이 이동량을 측정하지 못했습니다. 사진이 실제로 다른 위치에서 찍혔는지 확인하세요.")
     A = cam["A"]
     scale_mm = cam["scale"]                  # 축소 영상 기준 px/mm
     s = scale_mm * 0.985                     # 모자이크 px/mm (측정용)
