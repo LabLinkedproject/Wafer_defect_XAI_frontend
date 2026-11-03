@@ -17,6 +17,7 @@ import os
 import sys
 import json
 import time
+import subprocess
 import threading
 import traceback
 from datetime import datetime
@@ -27,7 +28,6 @@ import numpy as np
 import scan_config
 import wafer_model
 import wafer_stitch
-from adc import scan_input
 
 MOTOR_DIR = os.environ.get("MOTOR_DIR", "/home/orangepi/motor_test")
 if MOTOR_DIR not in sys.path:
@@ -40,6 +40,7 @@ SCAN_ROOT = os.path.join("captures", "scans")
 GPIO_CHIPS = [f"/dev/gpiochip{i}" for i in range(5)]
 
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 AE_TARGET = 100        # 촬영 노출 자동 맞춤: 사진 밝기 중앙값 목표 (0~255). 이보다 어두울 때만 올린다
 AE_TOLERANCE = 12
 AE_STEPS = 4
@@ -446,19 +447,28 @@ class ScanService:
 
     # ── 웨이퍼 맵 ──────────────────────────────────────────────────
     def _make_map(self, scan_dir, n):
-        def log(msg):
-            self.job["message"] = f"웨이퍼 맵: {msg}"
+        """맵 합성과 결함 검출을 별도 프로세스(map_job.py)로 돌린다. 끝나면 그 프로세스의 메모리가 모두 반납된다."""
         if n < wafer_stitch.MIN_IMAGES:
             raise JobError(f"합성에 필요한 사진이 부족합니다 ({n}장)")
-        self._phase("stitch")
         # 맵 방향은 하드웨어(갠트리 축과 웨이퍼의 관계)로 정해지므로 지금 설정을 따른다 (예전 스캔을 다시 합성할 때도)
-        wafer_stitch.build(scan_dir, log=log, flip_y=int(scan_config.load()["wafer_sign_y"]) < 0)
-        self._phase("detect")
-        log("결함 검출")
-        try:
-            scan_input.detect(os.path.basename(scan_dir.rstrip("/")))   # 분석 화면이 바로 쓰도록 미리 계산
-        except Exception as e:                                          # 맵은 이미 저장됐다. 분석 화면이 다시 시도한다
-            log(f"결함 검출 실패 ({e})")
+        cmd = [sys.executable, os.path.join(BASE_DIR, "map_job.py"), os.path.abspath(scan_dir)]
+        if int(scan_config.load()["wafer_sign_y"]) < 0:
+            cmd.append("--flip-y")
+        self._phase("stitch")
+        proc = subprocess.Popen(cmd, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        error, tail = None, []
+        for line in proc.stdout:
+            kind, _, msg = line.rstrip("\n").partition(" ")
+            if kind == "phase":
+                self._phase(msg)
+            elif kind == "log":
+                self.job["message"] = f"웨이퍼 맵: {msg}"
+            elif kind == "error":
+                error = msg
+            else:
+                tail = (tail + [line.rstrip()])[-5:]           # 경고 등. 실패하면 원인으로 보여 준다
+        if proc.wait() != 0:
+            raise JobError(f"웨이퍼 맵 합성 실패: {error or ' / '.join(tail) or f'종료 코드 {proc.returncode}'}")
 
     @staticmethod
     def _full_scans():

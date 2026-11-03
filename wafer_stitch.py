@@ -560,9 +560,17 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
     rgb, den = _compose(imgs, lc, cpos, Ac, S, SZ, kc, gains, color=True, glare=glare_c)
     mask = den > 0.02
     # 조명 색 보정: 채널별 밝기를 맞춰 LED 색이 웨이퍼 색으로 보이지 않게 한다
-    med = np.median(rgb[mask], 0)
+    # 밝기 범위는 웨이퍼 안쪽으로 정한다. 바깥의 하얀 바닥까지 넣으면 어두운 투명면이 0~255 중 10~30 에 몰려
+    # 계조가 부족해지고, 저장 잡음이 결함 대비만큼 커진다
+    inside = mask
+    if wafer and wafer["arc_deg"] >= 45:
+        yy_, xx_ = np.mgrid[0:SZ[0], 0:SZ[1]]
+        disc_ = np.hypot(xx_ - wafer["cx"] * out_scale, yy_ - wafer["cy"] * out_scale) < wafer["r"] * out_scale * 0.95
+        if (mask & disc_).sum() > 1000:
+            inside = mask & disc_
+    med = np.median(rgb[inside], 0)
     rgb = rgb * (med.mean() / np.maximum(med, 1e-6))
-    ref = rgb[mask]
+    ref = rgb[inside]
     lo, hi = np.percentile(ref, 0.5), np.percentile(ref, 99.7)
     out = np.clip((rgb - lo) / max(hi - lo, 1e-6) * 245, 0, 255).astype(np.uint8)
     out[~mask] = (18, 18, 20)
