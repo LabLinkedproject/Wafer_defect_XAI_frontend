@@ -35,6 +35,8 @@ DEFAULTS = {
     "camera_ref_scale": None,
     "camera_ref_sharpness": None,
     "camera_scale_hint": None,
+    # 투명 앞면 검출을 색 차이(R−B)로 한다. 기본은 흑백에서 어두운 것만 (wafer_detect.detection_channel 참고)
+    "detect_chroma": False,
     "jpeg_quality": 92,
 }
 

@@ -216,14 +216,13 @@ def quadrat_values(crops: dict, found: list[dict], P: int, per_die: int = 2) -> 
     return out
 
 
-def detection_channel(bgr: np.ndarray, meta: dict, dim_light: bool = False) -> tuple[np.ndarray, dict]:
+def detection_channel(bgr: np.ndarray, meta: dict, use_chroma: bool = False) -> tuple[np.ndarray, dict]:
     """검출에 쓸 한 장의 영상과 검출 설정 (channel, sharp_z, min_area_mm2, dark_only).
     - 밝은 바탕(불투명면): 흑백 그대로.
-    - 어두운 바탕 + 약한 조명(촬영 노출을 올린 스캔): 흑백에서 주변보다 어두운 것만 센다.
-      긴 노출에서 표면 흠집·얼룩은 희뿌옇게, 붙은 결함은 검게 보인다.
-    - 어두운 바탕 + 강한 조명: 색 차이(R−B). 강한 조명에서는 흠집이 하얗게 빛나 흑백을 지배한다.
-      붙은 결함은 따뜻한 색, 비친 바닥은 푸른색, 흠집·반사는 무채색이라 결함만 도드라진다.
-    세 경우의 근거: 2026-11-03 앞면 스캔 세 번 (강한 조명 9/9·오검출 0, 약한 조명 8/9·오검출 0)."""
+    - 어두운 바탕(투명 앞면): 흑백에서 주변보다 어두운 것만 센다. 표면 흠집·얼룩·반사는 희게, 붙은 결함은
+      검게 보인다. 2026-11-03 앞면 스캔 다섯 번 중 네 번에서 가장 정확했다 (8/8·오검출 0 등).
+    - use_chroma: 색 차이(R−B). 카메라가 가깝고 조명 반사가 커서 흠집이 하얗게 빛나던 한 번(9/9)에서만
+      나았고, 거리를 띄운 지금 환경에서는 0/8 이었다. 설정(detect_chroma)으로만 켠다."""
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     h, w = gray.shape
     (cx, cy), r = meta["wafer"]["center_px"], meta["wafer"]["radius_px"]
@@ -231,7 +230,7 @@ def detection_channel(bgr: np.ndarray, meta: dict, dim_light: bool = False) -> t
     disc = np.hypot(xx - cx, yy - cy) < r * 0.9
     if float(np.median(gray[disc])) >= DARK_BACKGROUND:
         return gray, {"channel": "gray", "sharp_z": SHARP_Z, "min_area_mm2": 0.0, "dark_only": False}
-    if dim_light:
+    if not use_chroma:
         return gray, {"channel": "gray-dark", "sharp_z": DARK_ONLY_Z, "min_area_mm2": MIN_CHROMA_AREA_MM2, "dark_only": True}
     b, _, rr = cv2.split(bgr.astype(np.float32))
     # 색 차이에서 결함은 가장자리(종이)만 따뜻한 색인 고리로 보여 흑백보다 신호가 약하다. 문턱을 한 단계 낮추고
