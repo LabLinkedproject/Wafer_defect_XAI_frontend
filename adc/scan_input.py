@@ -16,7 +16,7 @@ from .knowledge import DEFECT_TYPES
 
 SCAN_ROOT = os.path.join("captures", "scans")
 CACHE = "detection.json"
-VERSION = 5                     # 검출 방식이 바뀌면 올린다. 이전 결과는 다시 계산한다
+VERSION = 6                     # 검출 방식이 바뀌면 올린다. 이전 결과는 다시 계산한다
 
 
 def scan_dir(scan_id: str) -> str:
@@ -63,10 +63,11 @@ def detect(scan_id: str) -> dict:
         if cached.get("version") == VERSION:
             return cached
     meta = wafer_detect.load_meta(d)
-    gray, prof = wafer_detect.detection_channel(cv2.imread(map_path), meta)
+    gray, prof = wafer_detect.detection_channel(cv2.imread(map_path), meta, dim_light=_dim_light(d))
     mask_path = os.path.join(d, meta.get("mask", ""))
     seen = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE) if meta.get("mask") and os.path.isfile(mask_path) else None
-    r = wafer_detect.detect_array(gray, meta, seen=seen, min_area_mm2=prof["min_area_mm2"], sharp_z=prof["sharp_z"])
+    r = wafer_detect.detect_array(gray, meta, seen=seen, min_area_mm2=prof["min_area_mm2"], sharp_z=prof["sharp_z"],
+                                  dark_only=prof["dark_only"])
     out = {"version": VERSION, "scan": os.path.basename(d), "defects": r["defects"], "inspected": r["inspected"],
            "per_die": 2, "quadrats": [[k[0], k[1], k[2], v] for k, v in sorted(r["quadrats"].items())],
            "noise": r["noise"], "shift_px": r["shift_px"], "channel": prof["channel"]}
@@ -75,6 +76,17 @@ def detect(scan_id: str) -> dict:
         json.dump(out, f, ensure_ascii=False, default=float)
     os.replace(tmp, path)
     return out
+
+
+def _dim_light(d: str) -> bool:
+    """촬영 전 노출 자동 맞춤이 노출을 올렸으면 조명이 약했던 스캔이다."""
+    try:
+        with open(os.path.join(d, "manifest.json")) as f:
+            man = json.load(f)
+        start = man["config"].get("scan_exposure")
+        return bool(start and man.get("exposure_used") and man["exposure_used"] > start)
+    except (OSError, ValueError, KeyError):
+        return False
 
 
 def die_defects(det: dict) -> dict[int, dict]:

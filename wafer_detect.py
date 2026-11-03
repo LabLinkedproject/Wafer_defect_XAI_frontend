@@ -39,6 +39,7 @@ LINE_RESIDUAL_ELONGATION = 3.0
 GROW_RATIO = 0.6              # 이중 문턱의 낮은 쪽 (높은 문턱 대비)
 DARK_BACKGROUND = 80          # 웨이퍼 안쪽 밝기 중앙값이 이보다 어두우면 색 차이 채널로 검출
 CHROMA_GAIN = 3.0             # R−B 차이를 밝기 영상 범위로 늘리는 배율
+DARK_ONLY_Z = 6.0             # 어두운 것만 셀 때의 판정선
 CHROMA_Z = 6.0                # 색 차이 채널의 선명 결함 판정선 (흑백은 SHARP_Z)
 MIN_CHROMA_AREA_MM2 = 8.0     # 색 차이 채널은 잡음이 거칠어 이보다 작은 점은 결함으로 세지 않는다 (지름 약 3 mm)
 OUTLIER_RATIO = 0.25          # 국소 배경에서 이만큼 벗어난 픽셀은 배경 평균에서 뺀다
@@ -157,13 +158,15 @@ def _grid_residual(xs, ys, w, h, area_mm2, P, mm) -> bool:
     return (near_x or near_y) and (along or area_mm2 < 1.0)
 
 
-def extract(crops: dict, P: int, noise: dict, min_area_mm2: float = 0.0, sharp_z: float = SHARP_Z) -> list[dict]:
+def extract(crops: dict, P: int, noise: dict, min_area_mm2: float = 0.0, sharp_z: float = SHARP_Z,
+            dark_only: bool = False) -> list[dict]:
     """z 지도에서 결함 덩어리를 뽑아 유형과 웨이퍼 좌표를 붙인다."""
     mm = WAFER_MODEL["pitch_mm"] / P
     found = []
     for c in crops.values():
         thr = max(sharp_z * noise["sharp_sigma"], MIN_CONTRAST)
-        z = np.abs(c["sharp"])
+        # dark_only: 주변보다 어두워진 것만 결함으로 센다. 투명면에서 표면 흠집·얼룩은 희게, 붙은 결함은 검게 보인다
+        z = np.clip(-c["sharp"], 0, None) if dark_only else np.abs(c["sharp"])
         # 이중 문턱: 확실한 픽셀에서 출발해 절반 문턱까지 이어 붙인다. 대비가 약한 면에서 결함 하나가
         # 조각나는 것을 막고, 떨어져 있는 두 결함은 합치지 않는다
         weak = cv2.morphologyEx(((z > thr * GROW_RATIO) & c["mask"]).astype(np.uint8), cv2.MORPH_CLOSE,
@@ -213,45 +216,51 @@ def quadrat_values(crops: dict, found: list[dict], P: int, per_die: int = 2) -> 
     return out
 
 
-def detection_channel(bgr: np.ndarray, meta: dict) -> tuple[np.ndarray, dict]:
-    """검출에 쓸 한 장의 영상과 검출 설정 (channel, sharp_z, min_area_mm2).
-    밝은 바탕(불투명면)은 흑백 그대로 쓴다. 투명면 너머 바닥이 어둡게 비치면 흑백으로는 결함과 바닥의 차이가
-    작고, 표면 흠집·먼지가 하얗게 빛나 결함보다 진해진다. 그때는 색 차이(R−B)를 쓴다.
-    붙인 결함은 따뜻한 색, 비친 바닥은 푸른색, 흠집과 반사는 무채색이라 결함만 도드라진다."""
+def detection_channel(bgr: np.ndarray, meta: dict, dim_light: bool = False) -> tuple[np.ndarray, dict]:
+    """검출에 쓸 한 장의 영상과 검출 설정 (channel, sharp_z, min_area_mm2, dark_only).
+    - 밝은 바탕(불투명면): 흑백 그대로.
+    - 어두운 바탕 + 약한 조명(촬영 노출을 올린 스캔): 흑백에서 주변보다 어두운 것만 센다.
+      긴 노출에서 표면 흠집·얼룩은 희뿌옇게, 붙은 결함은 검게 보인다.
+    - 어두운 바탕 + 강한 조명: 색 차이(R−B). 강한 조명에서는 흠집이 하얗게 빛나 흑백을 지배한다.
+      붙은 결함은 따뜻한 색, 비친 바닥은 푸른색, 흠집·반사는 무채색이라 결함만 도드라진다.
+    세 경우의 근거: 2026-11-03 앞면 스캔 세 번 (강한 조명 9/9·오검출 0, 약한 조명 8/9·오검출 0)."""
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     h, w = gray.shape
     (cx, cy), r = meta["wafer"]["center_px"], meta["wafer"]["radius_px"]
     yy, xx = np.mgrid[0:h, 0:w]
     disc = np.hypot(xx - cx, yy - cy) < r * 0.9
     if float(np.median(gray[disc])) >= DARK_BACKGROUND:
-        return gray, {"channel": "gray", "sharp_z": SHARP_Z, "min_area_mm2": 0.0}
+        return gray, {"channel": "gray", "sharp_z": SHARP_Z, "min_area_mm2": 0.0, "dark_only": False}
+    if dim_light:
+        return gray, {"channel": "gray-dark", "sharp_z": DARK_ONLY_Z, "min_area_mm2": MIN_CHROMA_AREA_MM2, "dark_only": True}
     b, _, rr = cv2.split(bgr.astype(np.float32))
     # 색 차이에서 결함은 가장자리(종이)만 따뜻한 색인 고리로 보여 흑백보다 신호가 약하다. 문턱을 한 단계 낮추고
     # 대신 작은 점은 세지 않는다
     return (np.clip(128 + CHROMA_GAIN * (rr - b), 0, 255).astype(np.uint8),
-            {"channel": "chroma", "sharp_z": CHROMA_Z, "min_area_mm2": MIN_CHROMA_AREA_MM2})
+            {"channel": "chroma", "sharp_z": CHROMA_Z, "min_area_mm2": MIN_CHROMA_AREA_MM2, "dark_only": False})
 
 
 def detect(map_path: str, meta: dict, seen: np.ndarray | None = None) -> dict:
     img, prof = detection_channel(cv2.imread(map_path), meta)
-    return detect_array(img, meta, seen=seen, min_area_mm2=prof["min_area_mm2"], sharp_z=prof["sharp_z"])
+    return detect_array(img, meta, seen=seen, min_area_mm2=prof["min_area_mm2"], sharp_z=prof["sharp_z"],
+                        dark_only=prof["dark_only"])
 
 
 def detect_array(gray: np.ndarray, meta: dict, per_die: int = 2, seen: np.ndarray | None = None,
-                 min_area_mm2: float = 0.0, sharp_z: float = SHARP_Z) -> dict:
+                 min_area_mm2: float = 0.0, sharp_z: float = SHARP_Z, dark_only: bool = False) -> dict:
     img, valid, P = rectify(gray, meta, seen)
-    return detect_rectified(img, valid, P, per_die, min_area_mm2, sharp_z)
+    return detect_rectified(img, valid, P, per_die, min_area_mm2, sharp_z, dark_only)
 
 
 def detect_rectified(img: np.ndarray, valid: np.ndarray, P: int, per_die: int = 2, min_area_mm2: float = 0.0,
-                     sharp_z: float = SHARP_Z) -> dict:
+                     sharp_z: float = SHARP_Z, dark_only: bool = False) -> dict:
     dies = die_layout()
     crops = crop_dies(img, valid, P, dies)
     if len(crops) < 8:
         raise ValueError(f"검사 가능한 다이가 {len(crops)}개뿐입니다. 기준 다이를 만들려면 8개 이상 필요합니다.")
     align(crops, P)
     noise = analyse(crops, P)
-    found = extract(crops, P, noise, min_area_mm2, sharp_z)
+    found = extract(crops, P, noise, min_area_mm2, sharp_z, dark_only)
     counts: dict[int, dict] = {}
     for d in found:
         counts.setdefault(d["die"], {}).setdefault(d["type"], 0)

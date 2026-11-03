@@ -27,6 +27,8 @@ WORK_SCALE = 0.5           # 카메라 모델 측정용 축소
 SIGMA_RATIO = 0.24         # 합성 가중치 폭 (영상 높이 대비)
 MAX_RADIUS_RATIO = 0.62    # 합성에 쓰는 최대 반경 (영상 높이 대비). 바깥은 왜곡·감광이 크다
 MIN_IMAGES = 8
+AGREE_SCALE = 0.06         # 직접 잰 카메라 축척이 최근 값과 이만큼 넘게 다르면 최근 값 기준으로 다시 잰다
+AGREE_TURN_DEG = 4.0
 MASK_NAME = "wafer_map_mask.png"
 GLARE_LEVEL = 245          # 사진들의 중앙값이 이 이상이면 조명 정반사 (카메라 상한 약 248)
 GLARE_RATIO = 1.35         # 주변(넓은 중앙값) 대비 이 배율보다 밝으면 정반사
@@ -129,8 +131,10 @@ def _camera_matrix(scale: float, theta_deg: float, mirrored: bool) -> np.ndarray
     return scale * np.array([[math.cos(t), -sign * math.sin(t)], [math.sin(t), sign * math.cos(t)]])
 
 
-def camera_prior(scan_root: str, exclude: str) -> np.ndarray | None:
-    """가장 최근에 합성에 성공한 다른 스캔의 카메라 행렬 (축소 영상 기준). 카메라 장착이 같다고 본다."""
+def camera_prior(scan_root: str, exclude: str, recent: int = 5) -> np.ndarray | None:
+    """최근 합성에 성공한 다른 스캔들의 카메라 행렬 (축소 영상 기준). 카메라 장착이 같다고 본다.
+    한 번 잘못 잰 맵이 다음 기준을 오염시키지 않도록 최근 몇 개의 중앙값을 쓴다."""
+    scales, turns, mirrored = [], [], []
     for d in sorted(glob.glob(os.path.join(scan_root, "*_scan")), reverse=True):
         meta = os.path.join(d, "wafer_map.json")
         if os.path.abspath(d) == os.path.abspath(exclude) or not os.path.isfile(meta):
@@ -138,18 +142,26 @@ def camera_prior(scan_root: str, exclude: str) -> np.ndarray | None:
         with open(meta) as f:
             cam = json.load(f).get("camera")
         if cam:
-            return _camera_matrix(cam["px_per_mm_full"] * WORK_SCALE, cam["rotation_deg"], cam["mirrored"])
-    return None
+            scales.append(cam["px_per_mm_full"])
+            turns.append(cam["rotation_deg"])
+            mirrored.append(cam["mirrored"])
+        if len(scales) >= recent:
+            break
+    if not scales:
+        return None
+    return _camera_matrix(float(np.median(scales)) * WORK_SCALE, float(np.median(turns)),
+                          sum(mirrored) * 2 > len(mirrored))
 
 
 def _agrees(cam: dict, prior: np.ndarray) -> bool:
-    """직접 측정이 이전 카메라와 축척 20 %, 회전 10° 안에서 맞는지"""
+    """직접 측정이 이전 카메라와 맞는지. 지금까지 축척은 2 % 안에서 움직였다.
+    격자가 반복되는 면에서는 한 칸 어긋난 쌍 때문에 20 % 가까이 틀린 값이 나온 적이 있어 좁게 본다."""
     if not np.isfinite(cam["A"]).all():
         return False
     p_scale = float(np.linalg.norm(prior[:, 0]))
     p_theta = math.degrees(math.atan2(prior[1, 0], prior[0, 0]))
     turn = abs((cam["theta_deg"] - p_theta + 180) % 360 - 180)
-    return abs(cam["scale"] / p_scale - 1) < 0.2 and turn < 10
+    return abs(cam["scale"] / p_scale - 1) < AGREE_SCALE and turn < AGREE_TURN_DEG
 
 
 def _distort(x, y, q):
