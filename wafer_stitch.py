@@ -416,14 +416,14 @@ def measure_grid(mos: np.ndarray, den: np.ndarray, wafer: dict | None, s: float 
     L = int(round((expected or H / 10) * 0.5)) | 1            # 반 칸보다 긴 직선만 남긴다 (점 결함 제거)
     # 격자선은 밝은 바탕에선 어둡고, 투명면 너머 바닥이 어두우면 밝게 보인다. 긴 선 성분이 많은 쪽을 쓴다
     best_lines = None
-    for line in (np.clip(-hp, 0, 0.2), np.clip(hp, 0, 0.2)):
+    for kind, line in (("dark", np.clip(-hp, 0, 0.2)), ("bright", np.clip(hp, 0, 0.2))):
         line = line.astype(np.float32)
         v = cv2.morphologyEx(line, cv2.MORPH_OPEN, np.ones((L, 1), np.uint8))
         h_ = cv2.morphologyEx(line, cv2.MORPH_OPEN, np.ones((1, L), np.uint8))
         energy = float(v.sum() + h_.sum())
         if best_lines is None or energy > best_lines[0]:
-            best_lines = (energy, v, h_)
-    _, vert, horz = best_lines
+            best_lines = (energy, v, h_, kind)
+    _, vert, horz, line_kind = best_lines
     best = (0.0, -1.0)
     center = (wafer["cx"], wafer["cy"]) if wafer else (W / 2, H / 2)
     for a in np.arange(-6, 6.01, 0.25):
@@ -465,7 +465,7 @@ def measure_grid(mos: np.ndarray, den: np.ndarray, wafer: dict | None, s: float 
     else:
         out_phase = {}
     return {"angle_deg": angle, "pitch_px": float(np.mean(list(out.values()))), "phase": out_phase,
-            "pitch_x_px": out.get("x"), "pitch_y_px": out.get("y")}
+            "pitch_x_px": out.get("x"), "pitch_y_px": out.get("y"), "lines": line_kind}
 
 
 def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log=print, flip_y: bool | None = None,
@@ -619,7 +619,7 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
     if grid:
         ratio = (WAFER_DIAMETER_MM / 2) / wafer["r"] if wafer else None
         result["grid"] = {"angle_deg": grid["angle_deg"], "pitch_px": round(grid["pitch_px"] * out_scale, 1),
-                          "phase": grid["phase"],
+                          "phase": grid["phase"], "lines": grid["lines"],
                           "pitch_gantry_mm": round(grid["pitch_px"] / s, 2),
                           "pitch_mm": round(grid["pitch_px"] * ratio, 2) if ratio else None}
     if flip_y:

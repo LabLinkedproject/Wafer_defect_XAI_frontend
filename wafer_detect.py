@@ -37,7 +37,7 @@ HEAVY_QUADRAT_COUNT = 3
 LINE_GUARD_MM = 5.0           # 다이 경계선에서 이 거리 안의 가는 성분은 격자선 잔차
 LINE_RESIDUAL_ELONGATION = 3.0
 GROW_RATIO = 0.6              # 이중 문턱의 낮은 쪽 (높은 문턱 대비)
-DARK_BACKGROUND = 80          # 웨이퍼 안쪽 밝기 중앙값이 이보다 어두우면 색 차이 채널로 검출
+DARK_BACKGROUND = 120          # 격자선 밝기 정보가 없는 예전 맵: 웨이퍼 안쪽 중앙값이 이보다 어두우면 투명 앞면
 CHROMA_GAIN = 3.0             # R−B 차이를 밝기 영상 범위로 늘리는 배율
 DARK_ONLY_Z = 6.0             # 어두운 것만 셀 때의 판정선
 CHROMA_Z = 6.0                # 색 차이 채널의 선명 결함 판정선 (흑백은 SHARP_Z)
@@ -228,7 +228,11 @@ def detection_channel(bgr: np.ndarray, meta: dict, use_chroma: bool = False) -> 
     (cx, cy), r = meta["wafer"]["center_px"], meta["wafer"]["radius_px"]
     yy, xx = np.mgrid[0:h, 0:w]
     disc = np.hypot(xx - cx, yy - cy) < r * 0.9
-    if float(np.median(gray[disc])) >= DARK_BACKGROUND:
+    # 격자선이 밝게 보이면 투명 앞면(바닥이 비침), 어둡게 보이면 불투명면이다. 조명을 바꿔도 뒤집히지 않는다.
+    # 예전 맵에는 이 값이 없어 밝기로 가른다 (조명을 세게 한 앞면은 중앙값이 91 까지 올라갔다)
+    lines = meta.get("grid", {}).get("lines")
+    opaque = lines == "dark" if lines else float(np.median(gray[disc])) >= DARK_BACKGROUND
+    if opaque:
         return gray, {"channel": "gray", "sharp_z": SHARP_Z, "min_area_mm2": 0.0, "dark_only": False}
     if not use_chroma:
         return gray, {"channel": "gray-dark", "sharp_z": DARK_ONLY_Z, "min_area_mm2": MIN_CHROMA_AREA_MM2, "dark_only": True}
