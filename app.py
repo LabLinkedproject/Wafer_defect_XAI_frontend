@@ -6,6 +6,7 @@ app.py
 
 실행: ./venv/bin/python app.py   (http://<보드 IP>:5000)
 """
+import glob
 import subprocess
 import threading
 import time
@@ -18,7 +19,10 @@ from adc.routes import create_adc_blueprint
 from scan_routes import create_scan_blueprint
 
 JPEG_QUALITY = 85
-CAMERA_DEVICE = "/dev/video0"          # Arducam 1080P Low Light (USB, 어안 렌즈)
+# Arducam 1080P Low Light (USB, 어안 렌즈). USB 가 다시 연결되면 /dev/videoN 번호가 바뀌므로 고정 이름으로 찾는다
+CAMERA_BY_ID = "/dev/v4l/by-id/*Arducam*video-index0"
+CAMERA_FALLBACK = "/dev/video0"
+REOPEN_AFTER_S = 2.0                   # 이만큼 프레임이 안 오면 카메라를 다시 찾아 연다
 CAMERA_SIZE = (1920, 1080)             # 스캔 이미지 품질을 위해 1080p MJPG 로 받는다
 STREAM_WIDTH = 960                     # 브라우저 스트림은 축소해서 보냄 (CPU·대역폭 절약)
 STREAM_FPS_LIMIT = 20
@@ -31,6 +35,8 @@ class CameraManager:
 
     def __init__(self):
         self._cap = None
+        self._device = CAMERA_FALLBACK
+        self._exposure = None
         self._raw_frame = None
         self._raw_frame_id = 0
         self._jpeg = None
@@ -38,28 +44,50 @@ class CameraManager:
         self._running = False
         self._viewers = 0
 
-    def start(self, exposure=None):
-        self._cap = cv2.VideoCapture(CAMERA_DEVICE, cv2.CAP_V4L2)
+    @staticmethod
+    def _find_device() -> str:
+        found = sorted(glob.glob(CAMERA_BY_ID))
+        return found[0] if found else CAMERA_FALLBACK
+
+    def _open(self) -> bool:
+        if self._cap is not None:
+            self._cap.release()
+        self._device = self._find_device()
+        self._cap = cv2.VideoCapture(self._device, cv2.CAP_V4L2)
         self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_SIZE[0])
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_SIZE[1])
         self._cap.set(cv2.CAP_PROP_FPS, 30)
         if not self._cap.isOpened():
-            raise RuntimeError(f"카메라 열기 실패: {CAMERA_DEVICE}")
-        self.set_exposure(exposure)
+            return False
+        self.set_exposure(self._exposure)                 # 다시 열면 노출 설정이 초기화된다
+        return True
+
+    def start(self, exposure=None):
+        self._exposure = exposure
+        if not self._open():
+            raise RuntimeError(f"카메라 열기 실패: {self._device}")
         self._running = True
         threading.Thread(target=self._reader, daemon=True).start()
-        print("[Camera] started")
+        print("[Camera] started", self._device)
 
     def _reader(self):
         interval = 1.0 / STREAM_FPS_LIMIT
         params = [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY]
+        last_ok = time.monotonic()
         while self._running:
             t0 = time.monotonic()
             ret, frame = self._cap.read()
             if not ret:
+                # USB 가 끊겼다 다시 붙으면 장치 번호가 바뀐다. 잠시 기다렸다가 다시 찾아 연다
+                if time.monotonic() - last_ok > REOPEN_AFTER_S:
+                    print("[Camera] 프레임이 끊겨 다시 엽니다")
+                    if self._open():
+                        print("[Camera] 다시 열림", self._device)
+                    last_ok = time.monotonic()
                 time.sleep(0.05)
                 continue
+            last_ok = time.monotonic()
             # 원본은 항상 갱신한다 (스캔 촬영이 사용). cap.read() 는 매번 새 배열이라 참조만 저장해도 안전하다.
             with self._lock:
                 self._raw_frame = frame
@@ -114,6 +142,7 @@ class CameraManager:
 
     def set_exposure(self, value=None):
         """value=None 이면 자동 노출, 정수면 수동 노출 (1~5000, 작을수록 어두움)."""
+        self._exposure = value
         if value is None:
             args = ["--set-ctrl=auto_exposure=3"]
         else:
@@ -121,7 +150,7 @@ class CameraManager:
             args = ["--set-ctrl=auto_exposure=1", "--set-ctrl=backlight_compensation=0",
                     f"--set-ctrl=exposure_time_absolute={v}"]
         try:
-            r = subprocess.run(["v4l2-ctl", "-d", CAMERA_DEVICE, *args],
+            r = subprocess.run(["v4l2-ctl", "-d", self._device, *args],
                                capture_output=True, text=True, timeout=3)
             return r.returncode == 0
         except Exception as e:
