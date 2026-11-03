@@ -89,6 +89,13 @@ def create_scan_blueprint(camera) -> Blueprint:
     def build_map():
         return call(svc.build_latest_map)
 
+    @bp.route("/api/scan/light", methods=["POST"])
+    def light():
+        try:
+            return ok(result=svc.check_light())
+        except JobError as e:
+            return fail(str(e))
+
     @bp.route("/api/scan/align", methods=["POST"])
     def align():
         return call(svc.apply_alignment)

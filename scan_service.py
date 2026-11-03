@@ -45,6 +45,7 @@ AE_TOLERANCE = 12
 AE_STEPS = 4
 AE_SETTLE_S = 0.8      # 노출을 바꾼 뒤 센서가 따라오는 시간
 AE_MIN, AE_MAX = 5, 300
+LIGHT_CAP_EXPOSURE = 150   # 이 카메라는 노출 약 150 이상에서 밝기가 거의 늘지 않는다 (조명 점검 기준)
 
 
 class JobError(Exception):
@@ -486,6 +487,34 @@ class ScanService:
             self.job["result"] = os.path.basename(scans[0].rstrip("/"))
             self.job["message"] = "웨이퍼 맵 합성·결함 검출 완료"
         self._run("map", fn, motion=False)
+
+    def check_light(self) -> dict:
+        """조명 점검: 갠트리를 움직이지 않고 지금 위치에서 촬영 노출 자동 맞춤을 돌려 조명이 알맞은지 알려 준다.
+        자동 노출이 카메라 한계까지 올라가도 어두우면 조명이 부족한 것이다 (이 카메라는 노출 약 150 이상에서
+        밝기가 거의 늘지 않는다)."""
+        if self.job["busy"]:
+            raise JobError("작업 중에는 점검할 수 없습니다.")
+        cfg = scan_config.load()
+        start = int(cfg.get("scan_exposure") or 25)
+        try:
+            e = self._auto_exposure(start)
+            frame = self.camera.wait_new_frame(self.camera.frame_id(), timeout=2.0)
+        finally:
+            self.camera.set_exposure(cfg["exposure"])           # 화면은 미리보기 밝기로
+            self.job["message"] = "대기 중"
+        if frame is None:
+            raise JobError("카메라 프레임을 받지 못했습니다.")
+        g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        level = float(np.median(cv2.resize(g, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)))
+        sat = float((g >= 245).mean() * 100)
+        if e >= LIGHT_CAP_EXPOSURE and level < AE_TARGET - AE_TOLERANCE:
+            verdict, advice = "dark", f"조명이 부족합니다. 지금보다 {AE_TARGET / max(level, 1):.1f}배 이상 밝게 한 뒤 다시 점검하세요."
+        elif e >= LIGHT_CAP_EXPOSURE:
+            verdict, advice = "low", "밝기는 맞췄지만 노출이 한계에 가깝습니다. 조명을 조금 더 올리면 잡음이 줄어듭니다."
+        else:
+            verdict, advice = "ok", "알맞습니다. 이 조명으로 스캔하세요."
+        return {"exposure": e, "level": round(level), "target": AE_TARGET, "saturated_pct": round(sat, 1),
+                "verdict": verdict, "advice": advice}
 
     def apply_alignment(self) -> dict:
         """맵에서 측정한 웨이퍼 중심·반지름을 스캔 설정에 적용한다. 다음 스캔은 웨이퍼 전체를 덮는다."""

@@ -264,6 +264,22 @@
       showBanner(`정렬했습니다. 다음 스캔은 ${plan.order.length}장으로 웨이퍼 전체를 담습니다.`, true);
     } catch (e) { /* 배너 */ }
   };
+  $("btnLight").onclick = async () => {
+    const out = $("lightResult");
+    $("btnLight").disabled = true;
+    out.hidden = false;
+    out.className = "light-result";
+    out.textContent = "점검 중… (몇 초)";
+    try {
+      const r = (await api("/api/scan/light", {})).result;
+      out.className = `light-result ${r.verdict}`;
+      out.textContent = `${r.advice}  ·  촬영 노출 ${r.exposure} · 사진 밝기 ${r.level} (목표 ${r.target}) · 포화 반사 ${r.saturated_pct}%`;
+    } catch (e) {
+      out.textContent = "점검하지 못했습니다.";
+    } finally {
+      $("btnLight").disabled = false;
+    }
+  };
   $("btnBounds").onclick = () => { $("corners").innerHTML = ""; $("corners").dataset.n = "0"; act("/api/scan/bounds", {}); };
   $("btnOrigin").onclick = () => act("/api/gantry/origin", {});
   $("btnWaferCenter").onclick = () => act("/api/gantry/wafer-center", {});
