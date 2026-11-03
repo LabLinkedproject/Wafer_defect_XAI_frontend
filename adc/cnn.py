@@ -19,6 +19,7 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ONNX = os.path.join(BASE, "models", "wafernet.onnx")
 META = os.path.join(BASE, "models", "wafernet.json")
 _lock = threading.Lock()
+DIE_LEVEL = True        # 실측 입력을 다이 양불 단위로 판정한다 (Model 참고)
 _net = None
 _meta = None
 
@@ -64,8 +65,13 @@ class Model:
     kind = "cnn"
 
     def __init__(self, dies: list[dict], quadrats: dict, rule, per_die: int = 2):
-        self.dies, self.quadrats, self.rule, self.per_die = dies, quadrats, rule, per_die
-        self.ids = sorted({k[0] for k in quadrats})
+        self.dies, self.rule, self.per_die = dies, rule, per_die
+        self.ids = sorted({k[0] for k, v in quadrats.items() if v > 0})
+        if DIE_LEVEL:
+            # 결함이 하나라도 있는 다이는 다이 전체를 불량으로 넣는다 (웨이퍼 맵의 다이 양불 의미).
+            # 구역만 표시하면 5 mm 결함 하나가 다이의 1/4 칸 점이 되어, 다이 열 개로 된 고리도 흩어진 점으로 읽혔다
+            quadrats = {(i, a, b): R.HEAVY_VALUE for i in self.ids for a in range(per_die) for b in range(per_die)}
+        self.quadrats = quadrats
         self.thr = _load()[1]["thresholds"]
 
     def threshold(self, cls: str) -> float:
