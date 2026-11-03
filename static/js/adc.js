@@ -84,13 +84,15 @@
   function renderVerdict() {
     const top = S.top;
     const pat = S.patterns.find((p) => p.name === top);
-    $("verdict-title").textContent = top || "Normal";
-    $("verdict-sub").textContent = top ? `${pat.ko} · ${pat.desc}` : "판정선을 넘는 결함 패턴이 없습니다";
+    const sp = S.suspect;
+    $("verdict-title").textContent = top || (sp ? `${sp.name} 의심` : "Normal");
+    $("verdict-sub").textContent = top ? `${pat.ko} · ${pat.desc}`
+      : sp ? `점수 ${sp.score.toFixed(2)} · 판정선 ${sp.threshold.toFixed(2)} 아래 · 엔지니어 검토 권장` : "판정선을 넘는 결함 패턴이 없습니다";
     const tags = S.labels.slice(1).map((l) => `<span class="tag">복합 ${esc(l)}</span>`);
     if (S.ambiguous) tags.push('<span class="tag warn">판정 여유 낮음 · 엔지니어 검토 권장</span>');
     $("verdict-labels").innerHTML = tags.join("");
 
-    $("k-score").textContent = top ? S.top_score.toFixed(2) : "-";
+    $("k-score").textContent = top ? S.top_score.toFixed(2) : sp ? sp.score.toFixed(2) : "-";
     $("k-margin").textContent = top ? `2순위와 차이 ${S.margin.toFixed(2)}` : "";
     const y = S.yield;
     $("k-yield").textContent = `${y.yield_pct}%`;
@@ -533,6 +535,39 @@
     feedback({ verdict: "correct", labels, cause: $("fb-cause").value || null, note: $("fb-note").value }, "수정 판정을 재학습 라벨 후보로 저장했습니다.");
     $("fb-form").hidden = true;
   };
+
+  // ── 새 스캔 감시 ─────────────────────────────────────────────
+  // 스캔은 촬영 뒤 맵 합성·검출까지 1분 남짓 더 걸린다. 진행을 알리고, 끝나면 새 결과를 불러온다.
+  let scanNote = "";
+  let newest = null;          // 이 화면이 이미 알고 있는 가장 새 맵
+  async function watchScan() {
+    if (!S) return;
+    try {
+      const st = await (await fetch("/api/scan/status", { cache: "no-store" })).json();
+      const j = st.job, m = st.wafer_map;
+      newest ??= S.scans[0]?.id ?? null;
+      let note = "";
+      if (j.busy && j.name === "scan") {
+        note = (j.progress < j.total ? `스캔 진행 중 ${j.progress}/${j.total}장` : "촬영 완료 · 웨이퍼 맵 합성과 결함 검출 중") +
+          ". 끝나면 새 결과를 자동으로 불러옵니다.";
+      } else if (m?.wafer && m.dir !== newest && m.dir > (newest || "")) {
+        newest = m.dir;
+        if (S.session.source === "scan" && !S.session.edited && !S.belief.answered.length) {
+          selected = null;
+          await act("/api/adc/scan", { id: m.dir });
+        }
+      }
+      if (!note && newest && S.session.scan_id !== newest && S.session.source === "scan") {
+        note = "더 새 스캔이 있습니다. 위 입력 선택에서 고르면 불러옵니다.";
+      }
+      if (note !== scanNote) {
+        scanNote = note;
+        $("scan-note").textContent = note;
+        $("scan-note").hidden = !note;
+      }
+    } catch (e) { /* 스캔 콘솔이 없어도 대시보드는 동작한다 */ }
+  }
+  setInterval(watchScan, 3000);
 
   (async () => {
     try {

@@ -59,7 +59,13 @@ def _yield(die_stats: dict) -> dict:
             "heavy_die": die_stats["heavy"], "active_die": die_stats["active"]}
 
 
-def _conclusion(labels, top_hyp, zones_top, yield_pct) -> str:
+SUSPECT_MIN = 0.5   # 판정선 아래라도 이 점수 이상이면 정상과 구분해 '의심'으로 알린다
+
+
+def _conclusion(labels, top_hyp, zones_top, yield_pct, suspect=None) -> str:
+    if not labels and suspect:
+        return (f"판정선을 넘는 패턴은 없지만 {suspect['name']} 경향이 있습니다 (점수 {suspect['score']:.2f}, "
+                f"판정선 {suspect['threshold']:.2f}). 엔지니어 검토를 권장합니다.")
     if not labels:
         return "뚜렷한 결함 패턴이 없습니다. 공정은 정상 범위로 판단합니다."
     names = " + ".join(labels)
@@ -74,7 +80,10 @@ def _build_trace(ctx: dict) -> list[dict]:
     t = [{"kind": "observe", "title": "관찰",
           "text": f"다이 {ctx['active']}개 중 {ctx['defect_dies']}개에서 결함 {ctx['total']}건을 확인했습니다."}]
     if not ctx["labels"]:
-        t.append({"kind": "conclude", "title": "결론", "text": "판정선을 넘는 패턴이 없어 정상으로 판단합니다."})
+        sp = ctx.get("suspect")
+        t.append({"kind": "conclude", "title": "결론", "text":
+                  f"판정선을 넘는 패턴은 없습니다. {sp['name']} 점수 {sp['score']:.2f}(판정선 {sp['threshold']:.2f})라 검토 대상으로 표시합니다."
+                  if sp else "판정선을 넘는 패턴이 없어 정상으로 판단합니다."})
         return t
     t.append({"kind": "classify", "title": "분류",
               "text": f"{' + '.join(ctx['labels'])} 판정. 1순위 점수 {ctx['top_score']:.2f}, 2순위와 차이 {ctx['margin']:.2f}."})
@@ -204,13 +213,16 @@ def analyze(dies, spec, defects, answers=None, target=None, model=None) -> dict:
         recipe.append({"param": name, **r, "related": name in related})
 
     image_top = max(image_belief, key=image_belief.get) if image_belief else None
+    lead = ordered[0]
+    suspect = ({"name": lead, "score": round(scores[lead]["score"], 3), "threshold": model.threshold(lead)}
+               if not labels and defects and scores[lead]["score"] >= SUSPECT_MIN else None)
     trace = _build_trace({
         "active": len(dies), "defect_dies": len(defects), "total": total_defects, "labels": labels,
         "top_score": top_score, "margin": margin, "cf": cf,
         "contrib": next((c for c in scores[tgt]["contributions"] if c["impact"] > 0), None),
         "hyp": hyp_list, "history": history, "converged": converged, "checks": checks,
         "image_top_name": _HYP[image_top]["name"] if image_top else None,
-        "image_top_p": image_belief[image_top] if image_top else 0,
+        "image_top_p": image_belief[image_top] if image_top else 0, "suspect": suspect,
     })
 
     detections, stain = render.detect_regions(dies, defects, spec["pitch_mm"], spec["diameter_mm"])
@@ -236,6 +248,7 @@ def analyze(dies, spec, defects, answers=None, target=None, model=None) -> dict:
                    "entropy": h_now, "answered": [a["check"] for a in answers]},
         "risk": risk, "yield": yld, "projected": projected, "recipe": recipe,
         "stain": stain, "detections": detections, "image_size": render.IMAGE_SIZE,
-        "conclusion": _conclusion(labels, hyp_list[0] if hyp_list else None, dominant_zone, yld["yield_pct"]),
+        "suspect": suspect,
+        "conclusion": _conclusion(labels, hyp_list[0] if hyp_list else None, dominant_zone, yld["yield_pct"], suspect),
         "trace": trace,
     }
