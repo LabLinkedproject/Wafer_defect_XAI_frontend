@@ -1,0 +1,493 @@
+{
+  "dataset": "WM-811K 로트 분리 시험 (공개 공장 데이터, 실물 웨이퍼 아님)",
+  "size": 10323,
+  "model": "WaferNet B",
+  "thresholds": {
+    "Center": 0.96,
+    "Donut": 0.9,
+    "Edge-Loc": 0.64,
+    "Edge-Ring": 0.98,
+    "Local": 0.58,
+    "Random": 0.34,
+    "Scratch": 0.32,
+    "Near-full": 0.9
+  },
+  "modes": {
+    "quadrat2": {
+      "wafer": {
+        "tp_fp_fn_tn": [
+          3604,
+          296,
+          1134,
+          5289
+        ],
+        "precision": 0.9241,
+        "recall": 0.7607,
+        "specificity": 0.947,
+        "f1": 0.8345,
+        "gmean": 0.8487,
+        "accuracy": 0.8615
+      },
+      "per_class": {
+        "Center": {
+          "tp_fp_fn_tn": [
+            276,
+            51,
+            226,
+            9770
+          ],
+          "support": 502,
+          "precision": 0.844,
+          "recall": 0.5498,
+          "specificity": 0.9948,
+          "f1": 0.6659,
+          "gmean": 0.7396,
+          "accuracy": 0.9732
+        },
+        "Donut": {
+          "tp_fp_fn_tn": [
+            22,
+            24,
+            18,
+            10259
+          ],
+          "support": 40,
+          "precision": 0.4783,
+          "recall": 0.55,
+          "specificity": 0.9977,
+          "f1": 0.5116,
+          "gmean": 0.7408,
+          "accuracy": 0.9959
+        },
+        "Edge-Loc": {
+          "tp_fp_fn_tn": [
+            695,
+            334,
+            596,
+            8698
+          ],
+          "support": 1291,
+          "precision": 0.6754,
+          "recall": 0.5383,
+          "specificity": 0.963,
+          "f1": 0.5991,
+          "gmean": 0.72,
+          "accuracy": 0.9099
+        },
+        "Edge-Ring": {
+          "tp_fp_fn_tn": [
+            1846,
+            28,
+            157,
+            8292
+          ],
+          "support": 2003,
+          "precision": 0.9851,
+          "recall": 0.9216,
+          "specificity": 0.9966,
+          "f1": 0.9523,
+          "gmean": 0.9584,
+          "accuracy": 0.9821
+        },
+        "Local": {
+          "tp_fp_fn_tn": [
+            242,
+            527,
+            372,
+            9182
+          ],
+          "support": 614,
+          "precision": 0.3147,
+          "recall": 0.3941,
+          "specificity": 0.9457,
+          "f1": 0.35,
+          "gmean": 0.6105,
+          "accuracy": 0.9129
+        },
+        "Random": {
+          "tp_fp_fn_tn": [
+            70,
+            9,
+            16,
+            10228
+          ],
+          "support": 86,
+          "precision": 0.8861,
+          "recall": 0.814,
+          "specificity": 0.9991,
+          "f1": 0.8485,
+          "gmean": 0.9018,
+          "accuracy": 0.9976
+        },
+        "Scratch": {
+          "tp_fp_fn_tn": [
+            89,
+            590,
+            109,
+            9535
+          ],
+          "support": 198,
+          "precision": 0.1311,
+          "recall": 0.4495,
+          "specificity": 0.9417,
+          "f1": 0.203,
+          "gmean": 0.6506,
+          "accuracy": 0.9323
+        },
+        "Near-full": {
+          "tp_fp_fn_tn": [
+            4,
+            5,
+            0,
+            10314
+          ],
+          "support": 4,
+          "precision": 0.4444,
+          "recall": 1.0,
+          "specificity": 0.9995,
+          "f1": 0.6154,
+          "gmean": 0.9998,
+          "accuracy": 0.9995
+        }
+      },
+      "macro_f1": 0.5932,
+      "exact_match": 0.7689,
+      "ci95": {
+        "macro_f1": [
+          0.4453,
+          0.6031
+        ],
+        "wafer_recall": [
+          0.5291,
+          0.8572
+        ],
+        "wafer_specificity": [
+          0.912,
+          0.9757
+        ],
+        "exact_match": [
+          0.632,
+          0.8767
+        ]
+      },
+      "calibration": {
+        "ece": 0.1523,
+        "bins": [
+          {
+            "lo": 0.0,
+            "hi": 0.1,
+            "n": 6797,
+            "predicted": 0.0708,
+            "observed": 0.0174
+          },
+          {
+            "lo": 0.1,
+            "hi": 0.2,
+            "n": 3884,
+            "predicted": 0.1435,
+            "observed": 0.0489
+          },
+          {
+            "lo": 0.2,
+            "hi": 0.3,
+            "n": 2098,
+            "predicted": 0.2457,
+            "observed": 0.0848
+          },
+          {
+            "lo": 0.3,
+            "hi": 0.4,
+            "n": 1317,
+            "predicted": 0.3482,
+            "observed": 0.1397
+          },
+          {
+            "lo": 0.4,
+            "hi": 0.5,
+            "n": 1055,
+            "predicted": 0.4466,
+            "observed": 0.1953
+          },
+          {
+            "lo": 0.5,
+            "hi": 0.6,
+            "n": 879,
+            "predicted": 0.5492,
+            "observed": 0.248
+          },
+          {
+            "lo": 0.6,
+            "hi": 0.7,
+            "n": 812,
+            "predicted": 0.65,
+            "observed": 0.3424
+          },
+          {
+            "lo": 0.7,
+            "hi": 0.8,
+            "n": 765,
+            "predicted": 0.7484,
+            "observed": 0.383
+          },
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 780,
+            "predicted": 0.8514,
+            "observed": 0.4397
+          },
+          {
+            "lo": 0.9,
+            "hi": 1.0,
+            "n": 3277,
+            "predicted": 0.9837,
+            "observed": 0.8078
+          }
+        ]
+      }
+    },
+    "die_any": {
+      "wafer": {
+        "tp_fp_fn_tn": [
+          4435,
+          2228,
+          303,
+          3357
+        ],
+        "precision": 0.6656,
+        "recall": 0.936,
+        "specificity": 0.6011,
+        "f1": 0.778,
+        "gmean": 0.7501,
+        "accuracy": 0.7548
+      },
+      "per_class": {
+        "Center": {
+          "tp_fp_fn_tn": [
+            274,
+            594,
+            228,
+            9227
+          ],
+          "support": 502,
+          "precision": 0.3157,
+          "recall": 0.5458,
+          "specificity": 0.9395,
+          "f1": 0.4,
+          "gmean": 0.7161,
+          "accuracy": 0.9204
+        },
+        "Donut": {
+          "tp_fp_fn_tn": [
+            17,
+            6,
+            23,
+            10277
+          ],
+          "support": 40,
+          "precision": 0.7391,
+          "recall": 0.425,
+          "specificity": 0.9994,
+          "f1": 0.5397,
+          "gmean": 0.6517,
+          "accuracy": 0.9972
+        },
+        "Edge-Loc": {
+          "tp_fp_fn_tn": [
+            977,
+            1665,
+            314,
+            7367
+          ],
+          "support": 1291,
+          "precision": 0.3698,
+          "recall": 0.7568,
+          "specificity": 0.8157,
+          "f1": 0.4968,
+          "gmean": 0.7857,
+          "accuracy": 0.8083
+        },
+        "Edge-Ring": {
+          "tp_fp_fn_tn": [
+            1738,
+            12,
+            265,
+            8308
+          ],
+          "support": 2003,
+          "precision": 0.9931,
+          "recall": 0.8677,
+          "specificity": 0.9986,
+          "f1": 0.9262,
+          "gmean": 0.9308,
+          "accuracy": 0.9732
+        },
+        "Local": {
+          "tp_fp_fn_tn": [
+            493,
+            1847,
+            121,
+            7862
+          ],
+          "support": 614,
+          "precision": 0.2107,
+          "recall": 0.8029,
+          "specificity": 0.8098,
+          "f1": 0.3338,
+          "gmean": 0.8063,
+          "accuracy": 0.8094
+        },
+        "Random": {
+          "tp_fp_fn_tn": [
+            27,
+            255,
+            59,
+            9982
+          ],
+          "support": 86,
+          "precision": 0.0957,
+          "recall": 0.314,
+          "specificity": 0.9751,
+          "f1": 0.1467,
+          "gmean": 0.5533,
+          "accuracy": 0.9696
+        },
+        "Scratch": {
+          "tp_fp_fn_tn": [
+            46,
+            533,
+            152,
+            9592
+          ],
+          "support": 198,
+          "precision": 0.0794,
+          "recall": 0.2323,
+          "specificity": 0.9474,
+          "f1": 0.1184,
+          "gmean": 0.4691,
+          "accuracy": 0.9336
+        },
+        "Near-full": {
+          "tp_fp_fn_tn": [
+            4,
+            91,
+            0,
+            10228
+          ],
+          "support": 4,
+          "precision": 0.0421,
+          "recall": 1.0,
+          "specificity": 0.9912,
+          "f1": 0.0808,
+          "gmean": 0.9956,
+          "accuracy": 0.9912
+        }
+      },
+      "macro_f1": 0.3803,
+      "exact_match": 0.5773,
+      "ci95": {
+        "macro_f1": [
+          0.218,
+          0.4133
+        ],
+        "wafer_recall": [
+          0.9038,
+          0.945
+        ],
+        "wafer_specificity": [
+          0.5387,
+          0.6544
+        ],
+        "exact_match": [
+          0.4848,
+          0.6621
+        ]
+      },
+      "calibration": {
+        "ece": 0.2622,
+        "bins": [
+          {
+            "lo": 0.0,
+            "hi": 0.1,
+            "n": 7791,
+            "predicted": 0.0723,
+            "observed": 0.0082
+          },
+          {
+            "lo": 0.1,
+            "hi": 0.2,
+            "n": 3820,
+            "predicted": 0.1398,
+            "observed": 0.038
+          },
+          {
+            "lo": 0.2,
+            "hi": 0.3,
+            "n": 1976,
+            "predicted": 0.2523,
+            "observed": 0.0602
+          },
+          {
+            "lo": 0.3,
+            "hi": 0.4,
+            "n": 1522,
+            "predicted": 0.3448,
+            "observed": 0.0696
+          },
+          {
+            "lo": 0.4,
+            "hi": 0.5,
+            "n": 1280,
+            "predicted": 0.4465,
+            "observed": 0.0938
+          },
+          {
+            "lo": 0.5,
+            "hi": 0.6,
+            "n": 1057,
+            "predicted": 0.552,
+            "observed": 0.1362
+          },
+          {
+            "lo": 0.6,
+            "hi": 0.7,
+            "n": 1410,
+            "predicted": 0.6563,
+            "observed": 0.1759
+          },
+          {
+            "lo": 0.7,
+            "hi": 0.8,
+            "n": 1101,
+            "predicted": 0.7512,
+            "observed": 0.238
+          },
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 1342,
+            "predicted": 0.8523,
+            "observed": 0.2846
+          },
+          {
+            "lo": 0.9,
+            "hi": 1.0,
+            "n": 5638,
+            "predicted": 0.9786,
+            "observed": 0.5387
+          }
+        ]
+      }
+    }
+  },
+  "all_normal_baseline": {
+    "tp_fp_fn_tn": [
+      0,
+      0,
+      4738,
+      5585
+    ],
+    "accuracy": 0.541,
+    "recall": 0.0
+  }
+}
