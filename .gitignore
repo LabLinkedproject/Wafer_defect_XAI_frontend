@@ -32,10 +32,6 @@ captures/
 # Notebooks (있으면)
 .ipynb_checkpoints/
 
-# Generated mock wafer image — wafer_renderer.py로 언제든 재생성 가능
-# 사용자가 원하면 주석 처리해서 포함시킬 수 있음
-# static/img/wafer_donut_input.jpg
-
 # 스캔 콘솔 런타임 설정 (웨이퍼 중심 좌표 등, 장비마다 다름)
 scan_config.json
 
@@ -55,6 +51,7 @@ models/pipeline_state.json
 models/events.log
 models/data_status.json
 models/v1/
+models/run1/
 models/*.log
 models/progress_*.json
 models/job_progress.json
