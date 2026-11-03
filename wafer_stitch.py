@@ -27,12 +27,25 @@ WORK_SCALE = 0.5           # 카메라 모델 측정용 축소
 SIGMA_RATIO = 0.24         # 합성 가중치 폭 (영상 높이 대비)
 MAX_RADIUS_RATIO = 0.62    # 합성에 쓰는 최대 반경 (영상 높이 대비). 바깥은 왜곡·감광이 크다
 MIN_IMAGES = 8
+MASK_NAME = "wafer_map_mask.png"
+GLARE_LEVEL = 245          # 사진들의 중앙값이 이 이상이면 조명 정반사 (카메라 상한 약 248)
+GLARE_MARGIN = 0.06        # 반사 둘레 번짐까지 빼는 폭 (영상 높이 대비)
 WAFER_DIAMETER_MM = WAFER_MODEL["diameter_mm"]
 
 
 def _flatfield(stack: np.ndarray, sigma: float) -> np.ndarray:
     """장면은 사진마다 움직이고 조명은 카메라에 고정되어 있으므로 중앙값이 조명을 남긴다."""
     return cv2.GaussianBlur(np.median(stack, 0), (0, 0), sigma)
+
+
+def glare_mask(light: np.ndarray) -> np.ndarray:
+    """조명 정반사로 포화된 영역 (사진 좌표). light 는 사진들의 픽셀별 중앙값이다.
+    포화 둘레의 번짐까지 빼도록 넓힌다."""
+    m = (light >= GLARE_LEVEL).astype(np.uint8)
+    if not m.any():
+        return m.astype(bool)
+    r = max(3, int(light.shape[0] * GLARE_MARGIN))
+    return cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))) > 0
 
 
 def _edges(img: np.ndarray, win: np.ndarray) -> np.ndarray:
@@ -153,6 +166,8 @@ def _compose(images, flat_ref, pos, A, s, size, k, gains=None, sigma=None, color
     w0 = np.exp(-rr2 / (2 * sigma ** 2)).astype(np.float32)
     # 조명이 약해 잡음이 큰 영역과 렌즈 외곽은 쓰지 않는다
     w0[(flat_ref < flat_ref.max() * 0.22) | (rr2 > (MAX_RADIUS_RATIO * h) ** 2)] = 0
+    # 투명·거울면에서는 카메라에 붙은 조명이 매 사진 같은 자리에 하얗게 비친다. 그 자리는 다른 사진으로 채운다
+    w0[glare_mask(flat_ref)] = 0
     H, W = size
     c = (W / 2, H / 2)
     num = np.zeros((H, W, 3) if color else (H, W), np.float32)
@@ -359,11 +374,18 @@ def measure_grid(mos: np.ndarray, den: np.ndarray, wafer: dict | None, s: float 
     img[~m] = float(np.median(img[m]))
     hp = cv2.GaussianBlur(img, (0, 0), 1) - cv2.GaussianBlur(img, (0, 0), 8)
     hp[~cv2.erode(m.astype(np.uint8), np.ones((21, 21), np.uint8)).astype(bool)] = 0
-    dark = np.clip(-hp, 0, 0.2).astype(np.float32)          # 격자선은 어두운 선
     expected = wafer["r"] * WAFER_MODEL["pitch_mm"] / (WAFER_DIAMETER_MM / 2) if wafer else None
     L = int(round((expected or H / 10) * 0.5)) | 1            # 반 칸보다 긴 직선만 남긴다 (점 결함 제거)
-    vert = cv2.morphologyEx(dark, cv2.MORPH_OPEN, np.ones((L, 1), np.uint8))
-    horz = cv2.morphologyEx(dark, cv2.MORPH_OPEN, np.ones((1, L), np.uint8))
+    # 격자선은 밝은 바탕에선 어둡고, 투명면 너머 바닥이 어두우면 밝게 보인다. 긴 선 성분이 많은 쪽을 쓴다
+    best_lines = None
+    for line in (np.clip(-hp, 0, 0.2), np.clip(hp, 0, 0.2)):
+        line = line.astype(np.float32)
+        v = cv2.morphologyEx(line, cv2.MORPH_OPEN, np.ones((L, 1), np.uint8))
+        h_ = cv2.morphologyEx(line, cv2.MORPH_OPEN, np.ones((1, L), np.uint8))
+        energy = float(v.sum() + h_.sum())
+        if best_lines is None or energy > best_lines[0]:
+            best_lines = (energy, v, h_)
+    _, vert, horz = best_lines
     best = (0.0, -1.0)
     center = (wafer["cx"], wafer["cy"]) if wafer else (W / 2, H / 2)
     for a in np.arange(-6, 6.01, 0.25):
@@ -504,11 +526,16 @@ def build(scan_dir: str, out_dir: str | None = None, out_scale: float = 1.0, log
     out = np.clip((rgb - lo) / max(hi - lo, 1e-6) * 245, 0, 255).astype(np.uint8)
     out[~mask] = (18, 18, 20)
     name = "wafer_map.jpg"
-    cv2.imwrite(os.path.join(out_dir, name), out, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    # 색 정보를 줄이지 않고(4:4:4) 저장한다. 투명면 검출은 색 차이를 쓰므로 색이 8×8 블록으로 뭉개지면 안 된다
+    cv2.imwrite(os.path.join(out_dir, name), out, [cv2.IMWRITE_JPEG_QUALITY, 92,
+                                                    cv2.IMWRITE_JPEG_SAMPLING_FACTOR, cv2.IMWRITE_JPEG_SAMPLING_FACTOR_444])
+    # 촬영된 범위. 웨이퍼가 어둡게 찍히면 맵 밝기만으로는 미촬영 영역과 구분할 수 없다
+    cv2.imwrite(os.path.join(out_dir, MASK_NAME), mask.astype(np.uint8) * 255)
 
     center_g = (pos.max(0) + pos.min(0)) / 2
     result = {
-        "images": len(dies), "map": name, "size_px": [SZ[1], SZ[0]],
+        "images": len(dies), "map": name, "mask": MASK_NAME, "size_px": [SZ[1], SZ[0]],
+        "glare_pct": round(float(glare_mask(light).mean() * 100), 1),
         "camera": {"px_per_mm_full": round(scale_mm / WORK_SCALE, 3), "rotation_deg": round(cam["theta_deg"], 2),
                    "mirrored": cam["mirrored"], "fov_mm": [round(bgr[0].shape[1] / (scale_mm / WORK_SCALE), 1),
                                                           round(bgr[0].shape[0] / (scale_mm / WORK_SCALE), 1)]},

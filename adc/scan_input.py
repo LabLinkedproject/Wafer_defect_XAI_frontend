@@ -16,7 +16,7 @@ from .knowledge import DEFECT_TYPES
 
 SCAN_ROOT = os.path.join("captures", "scans")
 CACHE = "detection.json"
-VERSION = 1                     # 검출 방식이 바뀌면 올린다. 이전 결과는 다시 계산한다
+VERSION = 5                     # 검출 방식이 바뀌면 올린다. 이전 결과는 다시 계산한다
 
 
 def scan_dir(scan_id: str) -> str:
@@ -62,11 +62,14 @@ def detect(scan_id: str) -> dict:
             cached = json.load(f)
         if cached.get("version") == VERSION:
             return cached
-    gray = cv2.cvtColor(cv2.imread(map_path), cv2.COLOR_BGR2GRAY)
-    r = wafer_detect.detect_array(gray, wafer_detect.load_meta(d))
+    meta = wafer_detect.load_meta(d)
+    gray, prof = wafer_detect.detection_channel(cv2.imread(map_path), meta)
+    mask_path = os.path.join(d, meta.get("mask", ""))
+    seen = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE) if meta.get("mask") and os.path.isfile(mask_path) else None
+    r = wafer_detect.detect_array(gray, meta, seen=seen, min_area_mm2=prof["min_area_mm2"], sharp_z=prof["sharp_z"])
     out = {"version": VERSION, "scan": os.path.basename(d), "defects": r["defects"], "inspected": r["inspected"],
            "per_die": 2, "quadrats": [[k[0], k[1], k[2], v] for k, v in sorted(r["quadrats"].items())],
-           "noise": r["noise"], "shift_px": r["shift_px"]}
+           "noise": r["noise"], "shift_px": r["shift_px"], "channel": prof["channel"]}
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
         json.dump(out, f, ensure_ascii=False, default=float)
